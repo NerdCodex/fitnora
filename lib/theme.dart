@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   static final ThemeData darkTheme = ThemeData(
+    useMaterial3: true,
     fontFamily: "Poppins",
 
     scaffoldBackgroundColor: Colors.black,
@@ -12,8 +13,9 @@ class AppTheme {
       foregroundColor: Colors.white,
       titleTextStyle: TextStyle(
         fontFamily: "Poppins",
-        fontWeight: FontWeight.w600,
-        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        fontSize: 25,
+        
       ),
     ),
 
@@ -61,5 +63,15 @@ class AppTheme {
 
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
+
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: Colors.white12,
+          selectedItemColor: Colors.blue,
+          unselectedItemColor: Colors.grey,
+          unselectedLabelStyle: TextStyle(fontFamily: "Poppins"),
+          selectedLabelStyle: TextStyle(fontFamily: "Poppins"),
+          elevation: 10,
+          enableFeedback: false,
+        ),
   );
 }

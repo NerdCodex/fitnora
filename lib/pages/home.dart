@@ -1,7 +1,7 @@
-import 'package:fitnora/animations.dart';
-import 'package:fitnora/pages/login.dart';
+import 'package:fitnora/pages/food/food.dart';
+import 'package:fitnora/pages/profile/profile.dart';
+import 'package:fitnora/pages/workout/workout.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,19 +11,40 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  int _pageIndex = 0;
+
+  static const List<Widget> _tabs = [WorkoutPage(), FoodPage(), ProfilePage()];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Hello World"),
+      body: IndexedStack(
+        // preserves state
+        index: _pageIndex,
+        children: _tabs,
       ),
-      body: Center(
-        child: ElevatedButton(onPressed: () async {
-          final box = await Hive.box("auth");
-          box.delete("access_token");
-          
-          Navigator.pushReplacement(context, AppRoutes.slideFromRight(LoginPage()));
-        }, child: const Text("Logout",)),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _pageIndex,
+        onTap: (index) {
+          setState(() {
+            _pageIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.route_outlined),
+            label: "Workout",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.food_bank_outlined),
+            label: "Food",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_2_outlined),
+            label: "Profile",
+          ),
+        ],
       ),
     );
   }
