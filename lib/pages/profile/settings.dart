@@ -1,3 +1,5 @@
+import 'package:fitnora/animations.dart';
+import 'package:fitnora/pages/profile/update_profile.dart';
 import 'package:flutter/material.dart';
 
 class SettingsHeader extends StatelessWidget {
@@ -75,7 +77,9 @@ class _SettingsPageState extends State<SettingsPage> {
           SettingsTile(
             icon: Icons.person_2_outlined,
             title: "Profile",
-            onTap: () {},
+            onTap: () {
+              Navigator.push(context, AppRoutes.slideFromRight(UpdateProfilePage()));
+            },
           ),
           SettingsTile(
             icon: Icons.lock_outline,

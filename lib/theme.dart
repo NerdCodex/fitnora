@@ -14,7 +14,7 @@ class AppTheme {
       titleTextStyle: TextStyle(
         fontFamily: "Poppins",
         fontWeight: FontWeight.w800,
-        fontSize: 25,
+        fontSize: 20,
         
       ),
     ),
