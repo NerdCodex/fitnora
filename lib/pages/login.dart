@@ -181,7 +181,8 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final box = Hive.box('auth');
-    box.put("access_token", accessToken);
+    await box.put("access_token", accessToken);
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(context, AppRoutes.slideFromRight(HomePage()), (route) => false);
   }
 }

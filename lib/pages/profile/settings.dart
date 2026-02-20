@@ -1,6 +1,8 @@
 import 'package:fitnora/animations.dart';
+import 'package:fitnora/pages/login.dart';
 import 'package:fitnora/pages/profile/update_profile.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 class SettingsHeader extends StatelessWidget {
   final String text;
@@ -78,7 +80,10 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: Icons.person_2_outlined,
             title: "Profile",
             onTap: () {
-              Navigator.push(context, AppRoutes.slideFromRight(UpdateProfilePage()));
+              Navigator.push(
+                context,
+                AppRoutes.slideFromRight(UpdateProfilePage()),
+              );
             },
           ),
           SettingsTile(
@@ -105,22 +110,35 @@ class _SettingsPageState extends State<SettingsPage> {
             title: "Restore Backup",
             onTap: () {},
           ),
-          const SizedBox(height: 40,),
+          const SizedBox(height: 40),
           SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red, // Text color
-              splashFactory: InkRipple.splashFactory,
-              overlayColor: Colors.red.withOpacity(0.2), // Splash color
+            width: double.infinity,
+            height: 48,
+            child: TextButton(
+              onPressed: logout,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red, // Text color
+                splashFactory: InkRipple.splashFactory,
+                overlayColor: Colors.red.withOpacity(0.2), // Splash color
+              ),
+              child: const Text("Logout", style: TextStyle(fontSize: 16)),
             ),
-            child: const Text("Logout", style: TextStyle(fontSize: 16),),
           ),
-        ),
         ],
       ),
+    );
+  }
+
+  Future<void> logout() async {
+    final box = Hive.box("auth");
+    await box.delete("access_token");
+
+    if (!context.mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      AppRoutes.slideFromRight(LoginPage()),
+      (route) => false,
     );
   }
 }
