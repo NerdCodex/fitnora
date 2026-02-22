@@ -1,6 +1,9 @@
 import 'package:fitnora/animations.dart';
+import 'package:fitnora/components/alert.dart';
+import 'package:fitnora/pages/loading.dart';
 import 'package:fitnora/pages/login.dart';
 import 'package:fitnora/pages/profile/update_profile.dart';
+import 'package:fitnora/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
@@ -79,12 +82,7 @@ class _SettingsPageState extends State<SettingsPage> {
           SettingsTile(
             icon: Icons.person_2_outlined,
             title: "Profile",
-            onTap: () {
-              Navigator.push(
-                context,
-                AppRoutes.slideFromRight(UpdateProfilePage()),
-              );
-            },
+            onTap: updateProfile,
           ),
           SettingsTile(
             icon: Icons.lock_outline,
@@ -139,6 +137,44 @@ class _SettingsPageState extends State<SettingsPage> {
       context,
       AppRoutes.slideFromRight(LoginPage()),
       (route) => false,
+    );
+  }
+
+  Future<void> updateProfile() async {
+    // Show loading screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoadingScreen()),
+    );
+
+    final response = await ApiService.get("/user/profile", withAuth: true);
+
+    if (!mounted) return;
+
+    // Remove loading screen
+    Navigator.pop(context);
+
+    if (response.statusCode == 0) {
+      showMessageDialog(
+        context,
+        "No Internet: Please check your internet connection.",
+      );
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      showMessageDialog(context, "Session Expired", logout);
+      return;
+    }
+
+    if (response.statusCode == 200) {
+      Navigator.push(context, AppRoutes.slideFromRight(UpdateProfilePage()));
+      return;
+    }
+
+    showMessageDialog(
+      context,
+      response.data?["message"] ?? "Something went wrong",
     );
   }
 }

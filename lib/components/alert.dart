@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-void showMessageDialog(BuildContext context, String message) {
+void showMessageDialog(
+  BuildContext context,
+  String message,
+  [VoidCallback? onOk]
+) {
   showDialog(
     context: context,
     builder: (context) {
@@ -10,7 +14,10 @@ void showMessageDialog(BuildContext context, String message) {
         content: Text(message, style: const TextStyle(color: Colors.white)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              onOk?.call();
+            },
             child: const Text("OK", style: TextStyle(color: Colors.blue)),
           ),
         ],

@@ -191,6 +191,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       );
       return;
     }
+    
+    if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(context, AppRoutes.slideFromRight(LoginPage()), (route) => false);
   }
