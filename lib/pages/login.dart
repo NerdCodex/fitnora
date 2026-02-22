@@ -43,10 +43,21 @@ class _LoginPageState extends State<LoginPage> {
           child: Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset("assets/logo.png", height: 300),
+                Center(child: Image.asset("assets/logo.png", height: 280)),
 
-                const SizedBox(height: 10),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Email",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
 
                 AppTextField(
                   controller: emailController,
@@ -58,6 +69,17 @@ class _LoginPageState extends State<LoginPage> {
                 ),
 
                 const SizedBox(height: 20),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Password",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
 
                 AppTextField(
                   controller: passwordController,
@@ -97,18 +119,20 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 15),
 
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(context, AppRoutes.slideFromRight(ForgotPasswordPage()));
-                  },
-                  style: ButtonStyle(
-                    overlayColor: MaterialStateProperty.all(
-                      Colors.white12, // custom splash for text button
+                Center(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(context, AppRoutes.slideFromRight(ForgotPasswordPage()));
+                    },
+                    style: ButtonStyle(
+                      overlayColor: MaterialStateProperty.all(
+                        Colors.white12, // custom splash for text button
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    "Forgot Password?",
-                    style: TextStyle(color: Colors.white),
+                    child: const Text(
+                      "Forgot Password?",
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ),
               ],

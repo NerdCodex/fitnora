@@ -131,7 +131,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final box = Hive.box("auth");
     await box.delete("access_token");
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
       context,
@@ -168,7 +168,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     if (response.statusCode == 200) {
-      Navigator.push(context, AppRoutes.slideFromRight(UpdateProfilePage()));
+      Navigator.push(context, AppRoutes.slideFromRight(UpdateProfilePage(details: response.data ?? {})));
       return;
     }
 

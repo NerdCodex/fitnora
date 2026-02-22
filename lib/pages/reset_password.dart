@@ -157,6 +157,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       falseText: "CONTINUE",
     );
 
+    if (!mounted) return;
+
     if (exit == true) {
       if (context.mounted) {
         Navigator.pop(context);
@@ -178,6 +180,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       "new_password": newPassword
     });
 
+    if (!mounted) return;
+
     if (response.statusCode == 0) {
       showMessageDialog(context, "No internet connection");
       return;
@@ -192,8 +196,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       return;
     }
     
-    if (!mounted) return;
-
     Navigator.pushAndRemoveUntil(context, AppRoutes.slideFromRight(LoginPage()), (route) => false);
   }
 }

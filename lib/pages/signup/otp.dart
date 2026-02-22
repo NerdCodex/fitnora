@@ -101,7 +101,7 @@ class _OtpPageState extends State<OtpPage> {
                   ),
                 ),
                 onCompleted: (pin) {
-                  print(pin);
+                  
                 },
               ),
               const SizedBox(height: 40),
@@ -153,7 +153,7 @@ class _OtpPageState extends State<OtpPage> {
     );
 
     if (exit == true) {
-      if (context.mounted) {
+      if (mounted) {
         Navigator.pop(context);
       }
     }
@@ -237,7 +237,7 @@ class _OtpPageState extends State<OtpPage> {
 
     final response = await ApiService.post(url, {"user_email": widget.email});
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     if (response.statusCode == 0) {
       showMessageDialog(context, "No internet connection");

@@ -97,6 +97,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       isLoading = false;
     });
 
+    if (!mounted) return;
+
     if (response.statusCode == 0) {
       showMessageDialog(context, "No internet connection");
       return;

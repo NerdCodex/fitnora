@@ -65,6 +65,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
                 const SizedBox(height: 40),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Full Name",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
                 AppTextField(
                   controller: fullNameController,
                   hintText: "Full Name",
@@ -79,6 +90,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   },
                 ),
                 const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Password",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
                 AppTextField(
                   controller: passwordController,
                   hintText: "Password",
@@ -109,6 +131,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   },
                 ),
                 const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Re-Type Password",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
                 AppTextField(
                   controller: retypPasswordController,
                   hintText: "Re-Type Password",
@@ -138,6 +171,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   },
                 ),
                 const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Date of birth",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
 
                 Container(
                   decoration: BoxDecoration(
@@ -172,6 +216,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                 ),
 
                 const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text(
+                    "Gender",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
 
                 Container(
                   height: 50,
@@ -272,7 +327,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
     );
 
     if (exit == true) {
-      if (context.mounted) {
+      if (mounted) {
         Navigator.pop(context);
       }
     }

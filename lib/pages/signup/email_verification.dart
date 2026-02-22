@@ -23,7 +23,7 @@ class _EmailVerificationState extends State<EmailVerification> {
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 20, 16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: double.infinity,
@@ -43,6 +43,17 @@ class _EmailVerificationState extends State<EmailVerification> {
             ),
 
             const SizedBox(height: 30),
+            const Padding(
+              padding: EdgeInsets.only(left: 4, bottom: 6),
+              child: Text(
+                "Email",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
 
             AppTextField(hintText: "Email", controller: emailController),
             const SizedBox(height: 30),
@@ -56,7 +67,10 @@ class _EmailVerificationState extends State<EmailVerification> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white,),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text(
                         "Next",
@@ -88,7 +102,7 @@ class _EmailVerificationState extends State<EmailVerification> {
 
     final response = await ApiService.post("/email", {"user_email": email});
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     setState(() {
       isLoading = false;
@@ -109,7 +123,9 @@ class _EmailVerificationState extends State<EmailVerification> {
 
     Navigator.pushReplacement(
       context,
-      AppRoutes.slideFromRight(OtpPage(email: email, purpose: "email_verification",)),
+      AppRoutes.slideFromRight(
+        OtpPage(email: email, purpose: "email_verification"),
+      ),
     );
   }
 }
