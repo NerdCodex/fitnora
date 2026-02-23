@@ -3,6 +3,7 @@ import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/pages/loading.dart';
 import 'package:fitnora/pages/login.dart';
 import 'package:fitnora/pages/profile/update_profile.dart';
+import 'package:fitnora/pages/reset_password.dart';
 import 'package:fitnora/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
@@ -87,7 +88,7 @@ class _SettingsPageState extends State<SettingsPage> {
           SettingsTile(
             icon: Icons.lock_outline,
             title: "Reset Password",
-            onTap: () {},
+            onTap: resetPassword,
           ),
           SettingsTile(
             icon: Icons.notifications_active_outlined,
@@ -168,7 +169,54 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     if (response.statusCode == 200) {
-      Navigator.push(context, AppRoutes.slideFromRight(UpdateProfilePage(details: response.data ?? {})));
+      Navigator.push(
+        context,
+        AppRoutes.slideFromRight(
+          UpdateProfilePage(details: response.data ?? {}),
+        ),
+      );
+      return;
+    }
+
+    showMessageDialog(
+      context,
+      response.data?["message"] ?? "Something went wrong",
+    );
+  }
+
+  Future<void> resetPassword() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoadingScreen()),
+    );
+
+    final response = await ApiService.get("/user/updatepassword", withAuth: true);
+
+    if (!mounted) return;
+
+    // Remove loading screen
+    Navigator.pop(context);
+
+    if (response.statusCode == 0) {
+      showMessageDialog(
+        context,
+        "No Internet: Please check your internet connection.",
+      );
+      return;
+    }
+
+    if (response.statusCode == 401) {
+      showMessageDialog(context, "Session Expired", logout);
+      return;
+    }
+
+    if (response.statusCode == 200) {
+      Navigator.push(
+        context,
+        AppRoutes.slideFromRight(
+          ResetPasswordPage(verificationToken: response.data?["verification_token"],),
+        ),
+      );
       return;
     }
 

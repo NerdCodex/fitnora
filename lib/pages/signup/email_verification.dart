@@ -1,4 +1,5 @@
 import 'package:fitnora/animations.dart';
+import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/signup/otp.dart';
 import 'package:fitnora/services/api_service.dart';
@@ -43,17 +44,7 @@ class _EmailVerificationState extends State<EmailVerification> {
             ),
 
             const SizedBox(height: 30),
-            const Padding(
-              padding: EdgeInsets.only(left: 4, bottom: 6),
-              child: Text(
-                "Email",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            FormLabel(text: "Email"),
 
             AppTextField(hintText: "Email", controller: emailController),
             const SizedBox(height: 30),

@@ -1,5 +1,6 @@
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/alert.dart';
+import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/signup/otp.dart';
 import 'package:fitnora/services/api_service.dart';
@@ -43,7 +44,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             ),
 
             const SizedBox(height: 30),
-
+            FormLabel(text: "Email"),
             AppTextField(hintText: "Email", controller: emailController),
             const SizedBox(height: 30),
 

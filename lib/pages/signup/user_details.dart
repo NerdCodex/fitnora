@@ -2,6 +2,7 @@ import 'package:custom_sliding_segmented_control/custom_sliding_segmented_contro
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/dialog.dart';
+import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/home.dart';
 import 'package:fitnora/services/api_service.dart';
@@ -65,17 +66,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
                 const SizedBox(height: 40),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Full Name",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                FormLabel(text: "Full Name"),
                 AppTextField(
                   controller: fullNameController,
                   hintText: "Full Name",
@@ -90,17 +81,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Password",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                FormLabel(text: "Password"),
                 AppTextField(
                   controller: passwordController,
                   hintText: "Password",
@@ -131,17 +112,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Re-Type Password",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                FormLabel(text: "Re-Type Password"),
                 AppTextField(
                   controller: retypPasswordController,
                   hintText: "Re-Type Password",
@@ -171,17 +142,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Date of birth",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                FormLabel(text: "Date of birth"),
 
                 Container(
                   decoration: BoxDecoration(
@@ -216,17 +177,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
                 ),
 
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Gender",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                FormLabel(text: "Gender"),
 
                 Container(
                   height: 50,

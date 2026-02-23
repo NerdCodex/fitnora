@@ -1,10 +1,12 @@
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/dialog.dart';
+import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/login.dart';
 import 'package:fitnora/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   final String verificationToken;
@@ -56,7 +58,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               ),
 
               const SizedBox(height: 30),
-
+              FormLabel(text: "New Password"),
               AppTextField(
                 controller: passwordController,
                 hintText: "New Password",
@@ -85,6 +87,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 },
               ),
               const SizedBox(height: 8),
+              FormLabel(text: "Re-Type New Password"),
               AppTextField(
                 controller: retypPasswordController,
                 hintText: "Re-Type New Password",
@@ -170,14 +173,24 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     String newPassword = passwordController.text.trim();
     String reTypePassword = retypPasswordController.text.trim();
 
+    if (newPassword.isEmpty || reTypePassword.isEmpty) {
+      showMessageDialog(context, "Password cannot be empty.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showMessageDialog(context, "Password must be at least 6 characters.");
+      return;
+    }
+
     if (newPassword != reTypePassword) {
-      showMessageDialog(context, "Password Mismatch.");
+      showMessageDialog(context, "Password mismatch.");
       return;
     }
 
     final response = await ApiService.post("/resetpassword", {
       "verification_token": widget.verificationToken,
-      "new_password": newPassword
+      "new_password": newPassword,
     });
 
     if (!mounted) return;
@@ -191,11 +204,17 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     if (!response.isSuccess) {
       showMessageDialog(
         context,
-        response.data?["message"] ?? "Failed to reset password. Try Again Later.",
+        response.data?["message"] ??
+            "Failed to reset password. Try Again Later.",
       );
       return;
     }
-    
-    Navigator.pushAndRemoveUntil(context, AppRoutes.slideFromRight(LoginPage()), (route) => false);
+    final box = Hive.box("auth");
+    box.delete("access_token");
+    Navigator.pushAndRemoveUntil(
+      context,
+      AppRoutes.slideFromRight(LoginPage()),
+      (route) => false,
+    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/alert.dart';
+import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/forgot_password.dart';
 import 'package:fitnora/pages/home.dart';
@@ -47,18 +48,7 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Center(child: Image.asset("assets/logo.png", height: 280)),
 
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Email",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-
+                FormLabel(text: "Email"),
                 AppTextField(
                   controller: emailController,
                   focusNode: emailFocus,
@@ -69,17 +59,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
 
                 const SizedBox(height: 20),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text(
-                    "Password",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                FormLabel(text: "Password"),
 
                 AppTextField(
                   controller: passwordController,
