@@ -1,16 +1,21 @@
 import 'dart:io';
-
+import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/custom_bottom_sheet.dart';
+import 'package:fitnora/pages/workout/exercises/create_exercise.dart';
+import 'package:fitnora/services/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 class CustomExerciseTile extends StatefulWidget {
   final Map<String, dynamic> exercise;
   final bool options;
+  final VoidCallback? onChanged;
+
   const CustomExerciseTile({
     super.key,
     required this.exercise,
     this.options = true,
+    this.onChanged,
   });
 
   @override
@@ -32,6 +37,10 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
               ? FutureBuilder<File>(
                   future: _loadExerciseImage(widget.exercise['exercise_image']),
                   builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox(width: 48, height: 48);
+                    }
+
                     if (snapshot.hasData && snapshot.data!.existsSync()) {
                       return Image.file(
                         snapshot.data!,
@@ -40,6 +49,7 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
                         fit: BoxFit.cover,
                       );
                     }
+
                     return Image.asset(
                       "assets/dumbell.png",
                       width: 48,
@@ -70,7 +80,8 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
 
   Future<File> _loadExerciseImage(String fileName) async {
     final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/exerciseimages/$fileName');
+    final imagePath = '${dir.path}/$local_images/$fileName';
+    return File(imagePath);
   }
 
   void _showExerciseActions() {
@@ -86,7 +97,7 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
             CustomBottomSheetItem(
               icon: Icons.edit_rounded,
               label: "Edit Exercise",
-              onTap: () {},
+              onTap: editExercise,
             ),
             CustomBottomSheetItem(
               icon: Icons.delete_forever_rounded,
@@ -98,5 +109,20 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
         );
       },
     );
+  }
+
+  Future<void> editExercise() async {
+    Navigator.pop(context); // <-- Close bottom sheet first
+
+    final result = await Navigator.push(
+      context,
+      AppRoutes.slideFromRight(
+        CreateExercisePage(exerciseId: "${widget.exercise["exercise_id"]}"),
+      ),
+    );
+
+    if (result == true) {
+      widget.onChanged?.call();
+    }
   }
 }

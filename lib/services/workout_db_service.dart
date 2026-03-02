@@ -103,12 +103,35 @@ class WorkoutDatabaseService {
     final result = await db.query(
       'exercise',
       where: "exercise_id = ?",
-      whereArgs: [exerciseId],
+      whereArgs: [int.parse(exerciseId)],
       limit: 1,
     );
     if (result.isNotEmpty) {
       return result.first;
     }
     return null;
+  }
+
+  Future<void> updateExercise(
+    String exerciseId,
+    String exerciseImage,
+    String exerciseName,
+    String exerciseEquipment,
+    String exerciseType,
+  ) async {
+    final db = await database;
+
+    await db.update(
+      'exercise',
+      {
+        'exercise_image': exerciseImage,
+        'exercise_name': exerciseName,
+        'exercise_equipment': exerciseEquipment,
+        'exercise_type': exerciseType
+
+      },
+      where: 'exercise_id = ?',
+      whereArgs: [exerciseId],
+    );
   }
 }

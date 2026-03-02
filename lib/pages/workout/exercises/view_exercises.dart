@@ -109,7 +109,7 @@ class _ViewExercisesPageState extends State<ViewExercisesPage> {
                             itemBuilder: (context, index) {
                               final exercise = _filteredExercises[index];
 
-                              return CustomExerciseTile(exercise: exercise);
+                              return CustomExerciseTile(exercise: exercise, onChanged: loadExercises,);
                             },
                           )
                         : NoExerciseFound()

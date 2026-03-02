@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'package:fitnora/services/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 class CustomImagePicker extends StatefulWidget {
   final String initialImage;
@@ -18,6 +20,26 @@ class CustomImagePicker extends StatefulWidget {
 class _CustomImagePickerState extends State<CustomImagePicker> {
   File? image;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    if (widget.initialImage.isNotEmpty) {
+      _loadImage();
+    }
+  }
+
+  Future<void> _loadImage() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final imagePath = '${dir.path}/$local_images/${widget.initialImage}';
+    final file = File(imagePath);
+    if (await file.exists()) {
+    setState(() {
+      image = file;
+    });
+  }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +113,7 @@ class _CustomImagePickerState extends State<CustomImagePicker> {
 
     setState(() {
       image = null;
+      widget.onChange.call("");
     });
   }
 
