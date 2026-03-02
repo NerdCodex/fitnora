@@ -73,5 +73,9 @@ class AppTheme {
           elevation: 10,
           enableFeedback: false,
         ),
+        progressIndicatorTheme: ProgressIndicatorThemeData(
+          color: Colors.white,
+          circularTrackColor: Colors.grey
+        )
   );
 }

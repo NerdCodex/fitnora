@@ -24,7 +24,7 @@ class WorkoutDatabaseService {
 
     return openDatabase(
       dbPath,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -59,12 +59,12 @@ class WorkoutDatabaseService {
       CREATE TABLE routine_exercise (
         routine_exercise_id INTEGER PRIMARY KEY AUTOINCREMENT,
         routine_id INTEGER,
-        exercise_id INTEGERm
+        exercise_id INTEGER,
         exercise_order INTEGER NOT NULL,
 
         FOREIGN KEY (routine_id) REFERENCES routine(routine_id) ON DELETE CASCADE,
         
-        FOREIGN KEY (exercise_id) REFERENCES routine(exercise_id) ON DELETE CASCADE,
+        FOREIGN KEY (exercise_id) REFERENCES exercise(exercise_id) ON DELETE CASCADE,
 
         UNIQUE (routine_id, exercise_order)
       );
@@ -83,11 +83,32 @@ class WorkoutDatabaseService {
       'exercise_name': exerciseName,
       'exercise_equipment': exerciseEquipment,
       'exercise_type': exerciseType,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
     });
   }
 
   Future<List<Map<String, dynamic>>> getExercises() async {
     final db = await database;
-    return db.query('exercise', orderBy: 'exercise_id DESC');
+
+    return await db.query(
+      'exercise',
+      where: 'is_deleted = ?',
+      whereArgs: [0],
+      orderBy: 'exercise_id DESC',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getExercise(String exerciseId) async {
+    final db = await database;
+    final result = await db.query(
+      'exercise',
+      where: "exercise_id = ?",
+      whereArgs: [exerciseId],
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      return result.first;
+    }
+    return null;
   }
 }
