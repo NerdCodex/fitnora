@@ -19,8 +19,8 @@ samples, guidance on mobile development, and a full API reference.
 ## Todo
 - [x] Image Transfer
 - [x] Edit Exercise
-- [x] Delete Exercise
-- [ ] Create Routine
+- [ ] Delete Exercise
+- [x] Create Routine
 - [ ] Edit Routine
 - [ ] Delete Routine
 - [ ] Track Session
