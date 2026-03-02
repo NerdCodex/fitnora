@@ -134,4 +134,61 @@ class WorkoutDatabaseService {
       whereArgs: [exerciseId],
     );
   }
+
+  // Routine
+  Future<void> addRoutine(Map<String, dynamic> routineData) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Insert routine
+      final routineId = await txn.insert('routine', {
+        'routine_name': routineData['routine_name'],
+        'created_at': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      // Insert routine exercises
+      final exercises = routineData['exercise'] as List<Map<String, dynamic>>;
+
+      for (final ex in exercises) {
+        await txn.insert('routine_exercise', {
+          'routine_id': routineId,
+          'exercise_id': ex['exercise_id'],
+          'exercise_order': ex['exercise_order'] + 1,
+        });
+      }
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getRoutinesWithExercises() async {
+    final db = await database;
+
+    final routines = await db.query(
+      'routine',
+      where: 'is_deleted = 0',
+      orderBy: 'created_at DESC',
+    );
+
+    final List<Map<String, dynamic>> result = [];
+
+    for (final routine in routines) {
+      final exercises = await db.rawQuery(
+        '''
+      SELECT e.exercise_name
+      FROM routine_exercise re
+      JOIN exercise e ON e.exercise_id = re.exercise_id
+      WHERE re.routine_id = ?
+      ORDER BY re.exercise_order ASC
+      LIMIT 4
+    ''',
+        [routine['routine_id']],
+      );
+
+      result.add({
+        'routine_id': routine['routine_id'],
+        'routine_name': routine['routine_name'],
+        'exercises': exercises.map((e) => e['exercise_name']).toList(),
+      });
+    }
+
+    return result;
+  }
 }

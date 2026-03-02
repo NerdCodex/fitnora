@@ -1,5 +1,6 @@
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/custom_exercise_tile.dart';
+import 'package:fitnora/components/search_field.dart';
 import 'package:fitnora/pages/workout/exercises/create_exercise.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
@@ -69,32 +70,7 @@ class _ViewExercisesPageState extends State<ViewExercisesPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _onSearchChanged,
-                style: const TextStyle(color: Colors.white),
-                cursorColor: Colors.blue,
-                decoration: const InputDecoration(
-                  icon: Icon(Icons.search, color: Colors.grey),
-                  hintText: "Search exercise",
-                  hintStyle: TextStyle(color: Colors.grey),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 0,
-                    vertical: 11,
-                  ),
-                ),
-              ),
-            ),
+            SearchField(hintText: "Search Exercise", controller: _searchController, onChanged: _onSearchChanged),
 
             const SizedBox(height: 12),
             Expanded(

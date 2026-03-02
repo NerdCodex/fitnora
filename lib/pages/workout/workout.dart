@@ -1,6 +1,7 @@
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/elevated_boxbutton.dart';
 import 'package:fitnora/pages/workout/exercises/view_exercises.dart';
+import 'package:fitnora/pages/workout/routine/create_routine.dart';
 import 'package:flutter/material.dart';
 
 class WorkoutPage extends StatefulWidget {
@@ -28,7 +29,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     ElevatedBoxButton(
                       text: "New Routine",
                       iconData: Icons.paste_outlined,
-                      onTap: () {},
+                      onTap: goCreateRoutine,
                     ),
                     const SizedBox(width: 12),
                     ElevatedBoxButton(
@@ -48,5 +49,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   void goExercises() {
     Navigator.push(context, AppRoutes.slideFromRight(ViewExercisesPage()));
+  }
+
+  void goCreateRoutine() {
+    Navigator.push(context, AppRoutes.slideFromRight(CreateRoutinePage()));
   }
 }
