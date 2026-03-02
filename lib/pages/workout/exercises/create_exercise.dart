@@ -115,7 +115,7 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
                       FormLabel(text: "Exercise Equipment"),
                       CustomDropDown(
                         items: equipmentList,
-                        initialValue: selectedEquipment,
+                        initialValue: selectedEquipment.isEmpty ? null : selectedEquipment,
                         hintText: "Select Equipment",
                         onChange: (value) {
                           selectedEquipment = value!;
@@ -125,7 +125,7 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
                       FormLabel(text: "Exercise measurement"),
                       CustomDropDown(
                         items: ["reps", "seconds"],
-                        initialValue: selectedExerciseType,
+                        initialValue: selectedExerciseType.isEmpty ? null : selectedExerciseType,
                         hintText: "Select Measurement",
                         onChange: (value) {
                           selectedExerciseType = value!;
