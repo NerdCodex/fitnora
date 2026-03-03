@@ -24,12 +24,11 @@ class WorkoutDatabaseService {
 
     return openDatabase(
       dbPath,
-      version: 5,
+      version: 1,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
     );
   }
 
@@ -119,6 +118,7 @@ class WorkoutDatabaseService {
         chest REAL,
         waist REAL,
         hips REAL,
+        progress_image TEXT,
         measured_at INTEGER NOT NULL
       );
     ''');
@@ -150,76 +150,7 @@ class WorkoutDatabaseService {
     ''');
   }
 
-  // ==================== MIGRATION ====================
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 5) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS workout_session (
-          session_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          routine_id INTEGER,
-          started_at INTEGER NOT NULL,
-          completed_at INTEGER,
-          status TEXT NOT NULL DEFAULT 'in_progress',
-          FOREIGN KEY (routine_id) REFERENCES routine(routine_id) ON DELETE SET NULL
-        );
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS session_exercise (
-          session_exercise_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          session_id INTEGER NOT NULL,
-          exercise_id INTEGER NOT NULL,
-          exercise_order INTEGER NOT NULL,
-          FOREIGN KEY (session_id) REFERENCES workout_session(session_id) ON DELETE CASCADE,
-          FOREIGN KEY (exercise_id) REFERENCES exercise(exercise_id) ON DELETE CASCADE
-        );
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS session_set (
-          set_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          session_exercise_id INTEGER NOT NULL,
-          set_order INTEGER NOT NULL,
-          weight REAL NOT NULL DEFAULT 0,
-          reps INTEGER NOT NULL DEFAULT 0,
-          is_completed INTEGER NOT NULL DEFAULT 0,
-          FOREIGN KEY (session_exercise_id) REFERENCES session_exercise(session_exercise_id) ON DELETE CASCADE
-        );
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS body_measurement (
-          measurement_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          weight REAL,
-          height REAL,
-          body_fat REAL,
-          chest REAL,
-          waist REAL,
-          hips REAL,
-          measured_at INTEGER NOT NULL
-        );
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS food_item (
-          food_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          food_name TEXT NOT NULL,
-          calories REAL NOT NULL DEFAULT 0,
-          protein REAL NOT NULL DEFAULT 0,
-          carbs REAL NOT NULL DEFAULT 0,
-          fat REAL NOT NULL DEFAULT 0,
-          serving_size TEXT NOT NULL DEFAULT '1 serving',
-          created_at INTEGER NOT NULL
-        );
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS meal_log (
-          meal_log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          food_id INTEGER NOT NULL,
-          meal_type TEXT NOT NULL,
-          servings REAL NOT NULL DEFAULT 1,
-          logged_at INTEGER NOT NULL,
-          FOREIGN KEY (food_id) REFERENCES food_item(food_id) ON DELETE CASCADE
-        );
-      ''');
-    }
-  }
+
 
   // ================================================================
   //  EXERCISE METHODS (existing)
@@ -560,6 +491,36 @@ class WorkoutDatabaseService {
     return result;
   }
 
+  /// Add an exercise to an existing session (not from routine).
+  /// Returns the session_exercise_id. One default empty set is created.
+  Future<int> addSessionExercise(int sessionId, int exerciseId) async {
+    final db = await database;
+
+    // Get the next exercise order for this session
+    final maxOrder = await db.rawQuery(
+      'SELECT COALESCE(MAX(exercise_order), 0) as max_order FROM session_exercise WHERE session_id = ?',
+      [sessionId],
+    );
+    final nextOrder = (maxOrder.first['max_order'] as int) + 1;
+
+    final seId = await db.insert('session_exercise', {
+      'session_id': sessionId,
+      'exercise_id': exerciseId,
+      'exercise_order': nextOrder,
+    });
+
+    // Create one default empty set
+    await db.insert('session_set', {
+      'session_exercise_id': seId,
+      'set_order': 1,
+      'weight': 0,
+      'reps': 0,
+      'is_completed': 0,
+    });
+
+    return seId;
+  }
+
   /// Add a new set to a session exercise.
   Future<int> addSessionSet(int sessionExerciseId) async {
     final db = await database;
@@ -578,6 +539,16 @@ class WorkoutDatabaseService {
       'reps': 0,
       'is_completed': 0,
     });
+  }
+
+  /// Delete a session exercise and its cascaded sets.
+  Future<void> deleteSessionExercise(int sessionExerciseId) async {
+    final db = await database;
+    await db.delete(
+      'session_exercise',
+      where: 'session_exercise_id = ?',
+      whereArgs: [sessionExerciseId],
+    );
   }
 
   /// Update a specific set (weight, reps, completion).
@@ -682,6 +653,7 @@ class WorkoutDatabaseService {
       'chest': data['chest'],
       'waist': data['waist'],
       'hips': data['hips'],
+      'progress_image': data['progress_image'],
       'measured_at': data['measured_at'] ?? DateTime.now().millisecondsSinceEpoch,
     });
   }
@@ -735,6 +707,7 @@ class WorkoutDatabaseService {
         'chest': data['chest'],
         'waist': data['waist'],
         'hips': data['hips'],
+        'progress_image': data['progress_image'],
       },
       where: 'measurement_id = ?',
       whereArgs: [data['measurement_id']],

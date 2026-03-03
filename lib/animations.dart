@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppRoutes {
-  static Route slideFromRight(Widget page) {
-    return PageRouteBuilder(
+  static Route<T> slideFromRight<T>(Widget page) {
+    return PageRouteBuilder<T>(
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {

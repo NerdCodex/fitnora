@@ -1,10 +1,15 @@
+import 'dart:io';
 
 import 'package:fitnora/animations.dart';
+import 'package:fitnora/components/alert.dart';
+import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/profile/add_measurement.dart';
 import 'package:fitnora/pages/profile/settings.dart';
+import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -15,12 +20,11 @@ class ProfilePage extends StatefulWidget {
 }
 
 class ProfilePageState extends State<ProfilePage> {
-  Map<String, dynamic>? _latest;
   List<Map<String, dynamic>> _history = [];
   List<Map<String, dynamic>> _sessions = [];
   List<Map<String, dynamic>> _nutritionHistory = [];
   String _selectedNutritionMetric = 'Calories'; // Calories | Protein | Carbs
-  
+
   DateTime _focusedDate = DateTime.now();
   DateTime _selectedDate = DateTime.now();
   bool _loading = true;
@@ -37,13 +41,12 @@ class ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadData() async {
-    final latest = await WorkoutDatabaseService.instance.getLatestMeasurement();
     final history = await WorkoutDatabaseService.instance.getMeasurements();
     final sessions = await WorkoutDatabaseService.instance.getSessionHistory();
-    final nutritionHistory = await WorkoutDatabaseService.instance.getNutritionHistory();
+    final nutritionHistory = await WorkoutDatabaseService.instance
+        .getNutritionHistory();
     if (!mounted) return;
     setState(() {
-      _latest = latest;
       _history = history;
       _sessions = sessions;
       _nutritionHistory = nutritionHistory;
@@ -59,8 +62,7 @@ class ProfilePageState extends State<ProfilePage> {
         actions: [
           IconButton(
             onPressed: () {
-              Navigator.push(
-                  context, AppRoutes.slideFromRight(SettingsPage()));
+              Navigator.push(context, AppRoutes.slideFromRight(SettingsPage()));
             },
             icon: const Icon(Icons.settings),
           ),
@@ -74,15 +76,7 @@ class ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ================= LATEST MEASUREMENT CARD =================
-                  _buildLatestCard(),
-
-                  const SizedBox(height: 24),
-
                   // ================= MEASUREMENT CALENDAR =================
-                  _buildSectionHeader("Measurement History"),
-                  const SizedBox(height: 12),
-
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.grey.shade900,
@@ -91,9 +85,14 @@ class ProfilePageState extends State<ProfilePage> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: TableCalendar(
                       firstDay: DateTime.utc(2020, 1, 1),
-                      lastDay: DateTime.utc(2030, 12, 31),
+                      lastDay: DateTime.now().add(const Duration(days: 365)),
                       focusedDay: _focusedDate,
-                      selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                      calendarFormat: CalendarFormat.week,
+                      availableCalendarFormats: const {
+                        CalendarFormat.week: 'Week',
+                      },
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDate, day),
                       onDaySelected: (selectedDay, focusedDay) {
                         setState(() {
                           _selectedDate = selectedDay;
@@ -103,9 +102,19 @@ class ProfilePageState extends State<ProfilePage> {
                       headerStyle: const HeaderStyle(
                         formatButtonVisible: false,
                         titleCentered: true,
-                        titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                        titleTextStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        leftChevronIcon: Icon(
+                          Icons.chevron_left,
+                          color: Colors.white,
+                        ),
+                        rightChevronIcon: Icon(
+                          Icons.chevron_right,
+                          color: Colors.white,
+                        ),
                       ),
                       daysOfWeekStyle: const DaysOfWeekStyle(
                         weekdayStyle: TextStyle(color: Colors.white70),
@@ -117,18 +126,23 @@ class ProfilePageState extends State<ProfilePage> {
                         weekendTextStyle: TextStyle(color: Colors.white),
                       ),
                       calendarBuilders: CalendarBuilders(
-                        defaultBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false),
-                        todayBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false, isToday: true),
-                        selectedBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: true),
+                        defaultBuilder: (context, day, focusedDay) =>
+                            _buildCalendarCell(day, isSelected: false),
+                        todayBuilder: (context, day, focusedDay) =>
+                            _buildCalendarCell(
+                              day,
+                              isSelected: false,
+                              isToday: true,
+                            ),
+                        selectedBuilder: (context, day, focusedDay) =>
+                            _buildCalendarCell(day, isSelected: true),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  
-                  // ================= SELECTED DAY MEASUREMENTS =================
-                  ..._getMeasurementsForDay(_selectedDate).map((m) => _buildHistoryTile(m)),
-                  if (_getMeasurementsForDay(_selectedDate).isEmpty)
-                    _buildEmptyState("No measurements on this date"),
+                  const SizedBox(height: 24),
+
+                  // ================= SELECTED DAY MEASUREMENT =================
+                  _buildDailyMeasurementCard(),
 
                   const SizedBox(height: 24),
 
@@ -154,7 +168,9 @@ class ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 16),
                   ],
 
-                  if (_history.isEmpty && _sessions.isEmpty && _nutritionHistory.isEmpty)
+                  if (_history.isEmpty &&
+                      _sessions.isEmpty &&
+                      _nutritionHistory.isEmpty)
                     _buildEmptyState("No data for graphs yet"),
 
                   const SizedBox(height: 32),
@@ -181,17 +197,18 @@ class ProfilePageState extends State<ProfilePage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Text(
-          message,
-          style: const TextStyle(color: Colors.grey),
-        ),
+        child: Text(message, style: const TextStyle(color: Colors.grey)),
       ),
     );
   }
 
-  // ================= LATEST CARD =================
+  // ================= DAILY CARD =================
 
-  Widget _buildLatestCard() {
+  Widget _buildDailyMeasurementCard() {
+    final measurements = _getMeasurementsForDay(_selectedDate);
+    final hasEntry = measurements.isNotEmpty;
+    final m = hasEntry ? measurements.first : null;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -213,28 +230,68 @@ class ProfilePageState extends State<ProfilePage> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              GestureDetector(
-                onTap: _addMeasurement,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasEntry)
+                    GestureDetector(
+                      onTap: () =>
+                          _deleteMeasurement(m!['measurement_id'] as int),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  GestureDetector(
+                    onTap: hasEntry
+                        ? () => _editMeasurement(m!['measurement_id'] as int)
+                        : _addMeasurement,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        hasEntry ? "Edit" : "Create",
+                        style: const TextStyle(
+                          color: Colors.blueAccent,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.add, color: Colors.blueAccent, size: 20),
-                ),
+                ],
               ),
             ],
           ),
-          if (_latest == null) ...[
+          if (!hasEntry) ...[
             const SizedBox(height: 16),
             const Center(
               child: Column(
                 children: [
-                  Icon(Icons.monitor_weight_outlined, size: 42, color: Colors.white24),
+                  Icon(
+                    Icons.monitor_weight_outlined,
+                    size: 42,
+                    color: Colors.white24,
+                  ),
                   SizedBox(height: 8),
                   Text(
-                    "Tap + to record your first measurement",
+                    "No measurements recorded today\nTap Create to log your progress",
+                    textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white30, fontSize: 13),
                   ),
                 ],
@@ -242,28 +299,54 @@ class ProfilePageState extends State<ProfilePage> {
             ),
           ] else ...[
             const SizedBox(height: 16),
+            if (m!['progress_image'] != null &&
+                m['progress_image'].toString().isNotEmpty) ...[
+              Center(
+                child: FutureBuilder<File?>(
+                  future: resolveProgressImage(m['progress_image']),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox(
+                        height: 150,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final file = snapshot.data;
+                    if (file != null) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          file,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             Row(
               children: [
-                _buildStatItem("Weight", "${_latest!['weight'] ?? '-'}", "kg"),
-                _buildStatItem("Height", "${_latest!['height'] ?? '-'}", "cm"),
-                _buildStatItem(
-                    "Body Fat", "${_latest!['body_fat'] ?? '-'}", "%"),
+                _buildStatItem("Weight", "${m['weight'] ?? '-'}", "kg"),
+                _buildStatItem("Height", "${m['height'] ?? '-'}", "cm"),
+                _buildStatItem("Body Fat", "${m['body_fat'] ?? '-'}", "%"),
               ],
             ),
-            if (_latest!['chest'] != null ||
-                _latest!['waist'] != null ||
-                _latest!['hips'] != null) ...[
+            if (m['chest'] != null ||
+                m['waist'] != null ||
+                m['hips'] != null) ...[
               const SizedBox(height: 16),
               const Divider(color: Colors.white12),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _buildStatItem(
-                      "Chest", "${_latest!['chest'] ?? '-'}", "cm"),
-                  _buildStatItem(
-                      "Waist", "${_latest!['waist'] ?? '-'}", "cm"),
-                  _buildStatItem(
-                      "Hips", "${_latest!['hips'] ?? '-'}", "cm"),
+                  _buildStatItem("Chest", "${m['chest'] ?? '-'}", "cm"),
+                  _buildStatItem("Waist", "${m['waist'] ?? '-'}", "cm"),
+                  _buildStatItem("Hips", "${m['hips'] ?? '-'}", "cm"),
                 ],
               ),
             ],
@@ -271,6 +354,13 @@ class ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
+  }
+
+  Future<File?> resolveProgressImage(String? fileName) async {
+    if (fileName == null || fileName.isEmpty) return null;
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/$local_images/$fileName');
+    return await file.exists() ? file : null;
   }
 
   Widget _buildStatItem(String label, String value, String unit) {
@@ -304,7 +394,11 @@ class ProfilePageState extends State<ProfilePage> {
     }).toList();
   }
 
-  Widget _buildCalendarCell(DateTime day, {required bool isSelected, bool isToday = false}) {
+  Widget _buildCalendarCell(
+    DateTime day, {
+    required bool isSelected,
+    bool isToday = false,
+  }) {
     final hasMeasurement = _getMeasurementsForDay(day).isNotEmpty;
 
     return Container(
@@ -321,8 +415,12 @@ class ProfilePageState extends State<ProfilePage> {
           Text(
             '${day.day}',
             style: TextStyle(
-              color: isSelected ? Colors.white : (isToday ? Colors.blue : Colors.white),
-              fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+              color: isSelected
+                  ? Colors.white
+                  : (isToday ? Colors.blue : Colors.white),
+              fontWeight: isSelected || isToday
+                  ? FontWeight.bold
+                  : FontWeight.normal,
             ),
           ),
           if (hasMeasurement) ...[
@@ -341,101 +439,28 @@ class ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ================= HISTORY TILE =================
-
-  Widget _buildHistoryTile(Map<String, dynamic> m) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(m['measured_at'] as int);
-    final dateStr =
-        "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
-
-    return Dismissible(
-      key: ValueKey('meas_${m['measurement_id']}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      onDismissed: (_) async {
-        await WorkoutDatabaseService.instance
-            .deleteMeasurement(m['measurement_id'] as int);
-        _loadData();
-      },
-      child: GestureDetector(
-        onTap: () => _editMeasurement(m['measurement_id'] as int),
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF121212),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "${m['weight'] ?? '-'} kg",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _buildSubtitle(m),
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                dateStr,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _buildSubtitle(Map<String, dynamic> m) {
-    final parts = <String>[];
-    if (m['height'] != null) parts.add("${m['height']}cm");
-    if (m['body_fat'] != null) parts.add("${m['body_fat']}% BF");
-    if (m['chest'] != null) parts.add("Chest ${m['chest']}");
-    if (m['waist'] != null) parts.add("Waist ${m['waist']}");
-    return parts.isEmpty ? "Weight only" : parts.join(" · ");
-  }
-
   // ================= GRAPH 1: Body Weight + Body Fat =================
 
   Widget _buildBodyGraph() {
     final sortedHistory = List<Map<String, dynamic>>.from(_history)
-      ..sort((a, b) => (a['measured_at'] as int).compareTo(b['measured_at'] as int));
+      ..sort(
+        (a, b) => (a['measured_at'] as int).compareTo(b['measured_at'] as int),
+      );
 
     if (sortedHistory.isEmpty) return const SizedBox();
 
     final earliest = sortedHistory.first['measured_at'] as int;
     final weightSpots = <FlSpot>[];
     final bfSpots = <FlSpot>[];
+    final dateLabels = <double, String>{};
     double maxW = 0;
 
     for (var m in sortedHistory) {
-      final days = ((m['measured_at'] as int) - earliest) / (1000 * 60 * 60 * 24);
+      final days =
+          ((m['measured_at'] as int) - earliest) / (1000 * 60 * 60 * 24);
+      final dt = DateTime.fromMillisecondsSinceEpoch(m['measured_at'] as int);
+      dateLabels[days] = '${dt.day}/${dt.month}';
+
       final w = (m['weight'] as num?)?.toDouble() ?? 0;
       if (w > 0) {
         weightSpots.add(FlSpot(days, w));
@@ -462,15 +487,17 @@ class ProfilePageState extends State<ProfilePage> {
       title: "Body Weight & Fat",
       legends: [
         _buildLegend(Colors.blueAccent, "Weight (kg)"),
-        if (normalizedBf.isNotEmpty) _buildLegend(Colors.orangeAccent, "Body Fat (%)"),
+        if (normalizedBf.isNotEmpty)
+          _buildLegend(Colors.orangeAccent, "Body Fat (%)"),
       ],
       chart: LineChart(
         LineChartData(
           minY: 0,
           maxY: maxY,
           gridData: const FlGridData(show: false),
-          titlesData: _chartTitles(maxY),
+          titlesData: _chartTitles(maxY, dateLabels),
           borderData: FlBorderData(show: false),
+          lineTouchData: _tooltipData(dateLabels, "kg"),
           lineBarsData: [
             if (weightSpots.isNotEmpty)
               _lineBar(weightSpots, Colors.blueAccent),
@@ -486,18 +513,25 @@ class ProfilePageState extends State<ProfilePage> {
 
   Widget _buildVolumeGraph() {
     final sortedSessions = List<Map<String, dynamic>>.from(_sessions)
-      ..sort((a, b) => (a['started_at'] as int).compareTo(b['started_at'] as int));
+      ..sort(
+        (a, b) => (a['started_at'] as int).compareTo(b['started_at'] as int),
+      );
 
     if (sortedSessions.isEmpty) return const SizedBox();
 
     final earliest = sortedSessions.first['started_at'] as int;
     final volumeSpots = <FlSpot>[];
     final setsSpots = <FlSpot>[];
+    final dateLabels = <double, String>{};
     double maxVol = 0;
     double maxSets = 0;
 
     for (var s in sortedSessions) {
-      final days = ((s['started_at'] as int) - earliest) / (1000 * 60 * 60 * 24);
+      final days =
+          ((s['started_at'] as int) - earliest) / (1000 * 60 * 60 * 24);
+      final dt = DateTime.fromMillisecondsSinceEpoch(s['started_at'] as int);
+      dateLabels[days] = '${dt.day}/${dt.month}';
+
       final vol = (s['total_volume'] as num?)?.toDouble() ?? 0;
       final sets = (s['total_sets'] as num?)?.toDouble() ?? 0;
       if (vol > 0) {
@@ -521,7 +555,9 @@ class ProfilePageState extends State<ProfilePage> {
       normalizedSets.addAll(setsSpots);
     }
 
-    final maxY = maxVol > 0 ? maxVol * 1.2 : (maxSets > 0 ? maxSets * 1.2 : 100.0);
+    final maxY = maxVol > 0
+        ? maxVol * 1.2
+        : (maxSets > 0 ? maxSets * 1.2 : 100.0);
 
     return _buildChartContainer(
       title: "Workout Volume & Sets",
@@ -534,8 +570,9 @@ class ProfilePageState extends State<ProfilePage> {
           minY: 0,
           maxY: maxY,
           gridData: const FlGridData(show: false),
-          titlesData: _chartTitles(maxY),
+          titlesData: _chartTitles(maxY, dateLabels),
           borderData: FlBorderData(show: false),
+          lineTouchData: _tooltipData(dateLabels, ""),
           lineBarsData: [
             if (volumeSpots.isNotEmpty)
               _lineBar(volumeSpots, Colors.purpleAccent),
@@ -620,24 +657,34 @@ class ProfilePageState extends State<ProfilePage> {
               final isActive = _selectedNutritionMetric == metric;
               Color chipColor;
               switch (metric) {
-                case 'Protein': chipColor = Colors.redAccent; break;
-                case 'Carbs': chipColor = Colors.lightBlueAccent; break;
-                default: chipColor = Colors.amber;
+                case 'Protein':
+                  chipColor = Colors.redAccent;
+                  break;
+                case 'Carbs':
+                  chipColor = Colors.lightBlueAccent;
+                  break;
+                default:
+                  chipColor = Colors.amber;
               }
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: ChoiceChip(
-                  label: Text(metric, style: TextStyle(
-                    color: Colors.black,
-                    // color: isActive ? Colors.black : Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  )),
+                  label: Text(
+                    metric,
+                    style: TextStyle(
+                      color: Colors.black,
+                      // color: isActive ? Colors.black : Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   selected: isActive,
                   selectedColor: chipColor,
                   backgroundColor: Colors.white10,
                   side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   onSelected: (_) {
                     setState(() => _selectedNutritionMetric = metric);
                   },
@@ -660,10 +707,15 @@ class ProfilePageState extends State<ProfilePage> {
                       showTitles: true,
                       reservedSize: 45,
                       getTitlesWidget: (value, meta) {
-                        if (value == 0 || value >= chartMaxY) return const SizedBox();
+                        if (value == 0 || value >= chartMaxY) {
+                          return const SizedBox();
+                        }
                         return Text(
                           '${value.toInt()}$unit',
-                          style: const TextStyle(color: Colors.white38, fontSize: 9),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 9,
+                          ),
                         );
                       },
                     ),
@@ -672,7 +724,9 @@ class ProfilePageState extends State<ProfilePage> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 24,
-                      interval: _nutritionHistory.length > 7 ? (_nutritionHistory.length / 5).ceilToDouble() : 1,
+                      interval: _nutritionHistory.length > 7
+                          ? (_nutritionHistory.length / 5).ceilToDouble()
+                          : 1,
                       getTitlesWidget: (value, meta) {
                         final label = dateLabels[value];
                         if (label == null) return const SizedBox();
@@ -680,18 +734,24 @@ class ProfilePageState extends State<ProfilePage> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             label,
-                            style: const TextStyle(color: Colors.white38, fontSize: 9),
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 9,
+                            ),
                           ),
                         );
                       },
                     ),
                   ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                 ),
-                lineBarsData: [
-                  _lineBar(spots, lineColor),
-                ],
+                lineTouchData: _tooltipData(dateLabels, unit),
+                lineBarsData: [_lineBar(spots, lineColor)],
               ),
             ),
           ),
@@ -726,10 +786,7 @@ class ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 16,
-            children: legends,
-          ),
+          Wrap(spacing: 16, children: legends),
           const SizedBox(height: 12),
           Expanded(child: chart),
         ],
@@ -746,11 +803,8 @@ class ProfilePageState extends State<ProfilePage> {
       barWidth: 2.5,
       dotData: FlDotData(
         show: spots.length < 15,
-        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-          radius: 3,
-          color: color,
-          strokeWidth: 0,
-        ),
+        getDotPainter: (spot, percent, bar, index) =>
+            FlDotCirclePainter(radius: 3, color: color, strokeWidth: 0),
       ),
       belowBarData: BarAreaData(
         show: true,
@@ -759,14 +813,14 @@ class ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  FlTitlesData _chartTitles(double maxY) {
+  FlTitlesData _chartTitles(double maxY, Map<double, String> dateLabels) {
     return FlTitlesData(
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 40,
           getTitlesWidget: (value, meta) {
-            if (value == 0 || value == maxY) return const SizedBox();
+            if (value == 0 || value >= maxY) return const SizedBox();
             return Text(
               value.toInt().toString(),
               style: const TextStyle(color: Colors.white38, fontSize: 10),
@@ -774,9 +828,81 @@ class ProfilePageState extends State<ProfilePage> {
           },
         ),
       ),
-      bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 24,
+          interval: dateLabels.length > 7
+              ? (dateLabels.length / 5).ceilToDouble()
+              : 1,
+          getTitlesWidget: (value, meta) {
+            // Find the closest x-value label (since x might be fractional days)
+            String? label;
+            double minDiff = double.infinity;
+            for (final k in dateLabels.keys) {
+              final diff = (k - value).abs();
+              if (diff < 0.5 && diff < minDiff) {
+                minDiff = diff;
+                label = dateLabels[k];
+              }
+            }
+            if (label == null) return const SizedBox();
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+            );
+          },
+        ),
+      ),
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    );
+  }
+
+  LineTouchData _tooltipData(Map<double, String> dateLabels, String unit) {
+    return LineTouchData(
+      touchTooltipData: LineTouchTooltipData(
+        getTooltipColor: (_) => Colors.white,
+        getTooltipItems: (touchedSpots) {
+          return touchedSpots.map((spot) {
+            String? dateStr;
+            double minDiff = double.infinity;
+            for (final k in dateLabels.keys) {
+              final diff = (k - spot.x).abs();
+              if (diff <= 1.5 && diff < minDiff) {
+                // Widen search radius slightly for touch
+                minDiff = diff;
+                dateStr = dateLabels[k];
+              }
+            }
+            final valueStr = spot.y
+                .toStringAsFixed(1)
+                .replaceAll(RegExp(r'\.0$'), '');
+            return LineTooltipItem(
+              "$valueStr $unit\n",
+              const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+              children: [
+                if (dateStr != null)
+                  TextSpan(
+                    text: dateStr,
+                    style: const TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.normal,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            );
+          }).toList();
+        },
+      ),
     );
   }
 
@@ -784,32 +910,56 @@ class ProfilePageState extends State<ProfilePage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 4),
         Text(text, style: const TextStyle(color: Colors.white70, fontSize: 11)),
       ],
     );
   }
 
-  // ================= NAVIGATION =================
+  // ================= NAVIGATION / ACTIONS =================
 
   Future<void> _addMeasurement() async {
+    final hasEntry = _getMeasurementsForDay(_selectedDate).isNotEmpty;
+    if (hasEntry) {
+      showMessageDialog(
+        context,
+        "You already have a measurement for this date. Please edit the existing entry instead.",
+      );
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       AppRoutes.slideFromRight(AddMeasurementPage(measuredDate: _selectedDate)),
     );
-    if (result == true) {
-      _loadData();
-    }
+    if (result == true) _loadData();
   }
 
-  Future<void> _editMeasurement(int measurementId) async {
+  Future<void> _editMeasurement(int id) async {
     final result = await Navigator.push(
       context,
-      AppRoutes.slideFromRight(AddMeasurementPage(measurementId: measurementId)),
+      AppRoutes.slideFromRight(AddMeasurementPage(measurementId: id)),
     );
-    if (result == true) {
-      _loadData();
-    }
+    if (result == true) _loadData();
+  }
+
+  Future<void> _deleteMeasurement(int id) async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: "Delete Measurement?",
+      content: "Are you sure you want to delete this measurement entry?",
+      trueText: "DELETE",
+      falseText: "CANCEL",
+    );
+
+    if (confirm != true) return;
+
+    await WorkoutDatabaseService.instance.deleteMeasurement(id);
+    _loadData();
   }
 }

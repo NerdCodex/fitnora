@@ -1,9 +1,12 @@
 import 'dart:io';
 
+import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/dialog.dart';
+import 'package:fitnora/pages/workout/routine/select_exercise.dart';
 import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/workout_db_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -32,6 +35,7 @@ class _StartSessionPageState extends State<StartSessionPage> {
   TimeOfDay _endTime = TimeOfDay.now();
 
   final List<int> _addedSetIds = [];
+  final List<int> _addedSessionExerciseIds = [];
 
   @override
   void initState() {
@@ -77,16 +81,9 @@ class _StartSessionPageState extends State<StartSessionPage> {
   Future<void> _loadExercises() async {
     try {
       final rawData = await WorkoutDatabaseService.instance.getSessionExercises(widget.sessionId);
-      
-      // Deep copy to allow in-memory modifications
-      final List<Map<String, dynamic>> data = [];
-      for (var ex in rawData) {
-        final sets = (ex['sets'] as List).cast<Map<String, dynamic>>();
-        data.add({
-          ...ex,
-          'sets': sets.map((s) => Map<String, dynamic>.from(s)).toList(),
-        });
-      }
+
+      // Deep copy on a background isolate to avoid jank
+      final data = await compute(_deepCopyExercises, rawData);
 
       if (!mounted) return;
       setState(() {
@@ -140,11 +137,25 @@ class _StartSessionPageState extends State<StartSessionPage> {
     );
     if (tm != null) {
       setState(() {
-        if (isStart) _startTime = tm;
-        else _endTime = tm;
+        if (isStart) {
+          _startTime = tm;
+        } else {
+          _endTime = tm;
+        }
         _markChanged();
       });
     }
+  }
+
+  /// Returns true if start time is strictly before end time.
+  bool _validateTimes() {
+    final startDt = DateTime(_sessionDate.year, _sessionDate.month, _sessionDate.day, _startTime.hour, _startTime.minute);
+    final endDt = DateTime(_sessionDate.year, _sessionDate.month, _sessionDate.day, _endTime.hour, _endTime.minute);
+    if (startDt.isAtSameMomentAs(endDt) || startDt.isAfter(endDt)) {
+      showMessageDialog(context, "Start time must be before end time.");
+      return false;
+    }
+    return true;
   }
 
   // ================= BUILD =================
@@ -185,12 +196,32 @@ class _StartSessionPageState extends State<StartSessionPage> {
                         : ListView.builder(
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                            itemCount: _exercises.length,
+                            itemCount: _exercises.length + 1, // +1 for Add Exercise button
                             itemBuilder: (context, index) {
+                              if (index == _exercises.length) {
+                                // "Add Exercise" button at bottom
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 16),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: TextButton.icon(
+                                      onPressed: _showAddExercisePicker,
+                                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                                      label: const Text("Add Exercise"),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.blue,
+                                        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
                               return _ExerciseCard(
                                 exercise: _exercises[index],
                                 onAddSet: (seId) => _addNewSet(index, seId),
                                 onSetChanged: (setIndex, setData) => _updateSetInfo(index, setIndex, setData),
+                                onDeleteSet: (setIndex, setId) => _deleteSet(index, setIndex, setId),
+                                onDeleteExercise: () => _deleteExercise(index),
                               );
                             },
                           ),
@@ -312,6 +343,75 @@ class _StartSessionPageState extends State<StartSessionPage> {
     _markChanged();
   }
 
+  Future<void> _deleteSet(int exerciseIndex, int setIndex, int setId) async {
+    await WorkoutDatabaseService.instance.deleteSessionSet(setId);
+    _addedSetIds.remove(setId);
+
+    setState(() {
+      final sets = _exercises[exerciseIndex]['sets'] as List<Map<String, dynamic>>;
+      sets.removeAt(setIndex);
+      // Re-number remaining sets
+      for (int i = 0; i < sets.length; i++) {
+        sets[i]['set_order'] = i + 1;
+      }
+      _markChanged();
+    });
+  }
+
+  Future<void> _deleteExercise(int exerciseIndex) async {
+    final ex = _exercises[exerciseIndex];
+    final seId = ex['session_exercise_id'] as int;
+
+    final confirm = await showConfirmDialog(
+      context,
+      title: "Remove Exercise?",
+      content: "Remove \"${ex['exercise_name']}\" from this session? This won't delete the exercise itself.",
+      trueText: "REMOVE",
+      falseText: "CANCEL",
+    );
+    if (confirm != true) return;
+
+    await WorkoutDatabaseService.instance.deleteSessionExercise(seId);
+    _addedSessionExerciseIds.remove(seId);
+
+    setState(() {
+      _exercises.removeAt(exerciseIndex);
+      _markChanged();
+    });
+  }
+
+  // ================= ADD EXERCISE =================
+
+  Future<void> _showAddExercisePicker() async {
+    final existingIds = _exercises.map((e) => e['exercise_id'] as int).toSet();
+
+    final result = await Navigator.push<List<Map<String, dynamic>>>(
+      context,
+      AppRoutes.slideFromRight(
+        SelectExercisePage(alreadySelectedIds: existingIds),
+      ),
+    );
+
+    if (result == null || result.isEmpty) return;
+
+    for (final exercise in result) {
+      await _addExerciseToSession(exercise);
+    }
+
+    // Reload to get the default sets created by addSessionExercise
+    await _loadExercises();
+  }
+
+  Future<void> _addExerciseToSession(Map<String, dynamic> exercise) async {
+    final exerciseId = exercise['exercise_id'] as int;
+    final seId = await WorkoutDatabaseService.instance.addSessionExercise(widget.sessionId, exerciseId);
+    _addedSessionExerciseIds.add(seId);
+    _markChanged();
+  }
+
+  // After all exercises added, reload to get the default sets
+  // (called once after the picker returns, handled by _showAddExercisePicker ending with _loadExercises)
+
   // ================= SAVE DATA =================
 
   Future<void> _flushToDB() async {
@@ -340,6 +440,8 @@ class _StartSessionPageState extends State<StartSessionPage> {
   }
 
   Future<void> _finishWorkout() async {
+    if (!_validateTimes()) return;
+
     final confirm = await showConfirmDialog(
       context,
       title: "Finish Workout?",
@@ -360,9 +462,10 @@ class _StartSessionPageState extends State<StartSessionPage> {
 
   Future<void> _saveSession() async {
     if (!_hasChanges) return;
-    
+    if (!_validateTimes()) return;
+
     await _flushToDB();
-    
+
     if (!mounted) return;
     showMessageDialog(context, "Changes saved!", () {
       Navigator.pop(context, true);
@@ -402,7 +505,10 @@ class _StartSessionPageState extends State<StartSessionPage> {
       if (!_isCompleted) {
         await WorkoutDatabaseService.instance.deleteSession(widget.sessionId);
       } else {
-        // Rollback any sets created during editing
+        // Rollback any exercises and sets created during editing
+        for (final id in _addedSessionExerciseIds) {
+          await WorkoutDatabaseService.instance.deleteSessionExercise(id);
+        }
         for (final id in _addedSetIds) {
           await WorkoutDatabaseService.instance.deleteSessionSet(id);
         }
@@ -422,11 +528,15 @@ class _ExerciseCard extends StatelessWidget {
   final Map<String, dynamic> exercise;
   final Function(int sessionExerciseId) onAddSet;
   final Function(int setIndex, Map<String, dynamic> updatedData) onSetChanged;
+  final Function(int setIndex, int setId) onDeleteSet;
+  final VoidCallback onDeleteExercise;
 
   const _ExerciseCard({
     required this.exercise,
     required this.onAddSet,
     required this.onSetChanged,
+    required this.onDeleteSet,
+    required this.onDeleteExercise,
   });
 
   @override
@@ -463,6 +573,11 @@ class _ExerciseCard extends StatelessWidget {
                   ],
                 ),
               ),
+              IconButton(
+                onPressed: onDeleteExercise,
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
+                tooltip: "Remove from session",
+              ),
             ],
           ),
 
@@ -483,10 +598,12 @@ class _ExerciseCard extends StatelessWidget {
           // Set Rows
           ...sets.asMap().entries.map((entry) {
             return _SetRow(
+              key: ValueKey('set_${entry.value['set_id']}'),
               setNumber: entry.key + 1,
               setData: entry.value,
               exerciseType: exercise['exercise_type'] as String? ?? 'reps',
               onChanged: (newData) => onSetChanged(entry.key, newData),
+              onDelete: () => onDeleteSet(entry.key, entry.value['set_id'] as int),
             );
           }),
 
@@ -523,12 +640,15 @@ class _SetRow extends StatefulWidget {
   final Map<String, dynamic> setData;
   final String exerciseType;
   final Function(Map<String, dynamic>) onChanged;
+  final VoidCallback onDelete;
 
   const _SetRow({
+    super.key,
     required this.setNumber,
     required this.setData,
     required this.exerciseType,
     required this.onChanged,
+    required this.onDelete,
   });
 
   @override
@@ -549,11 +669,14 @@ class _SetRowState extends State<_SetRow> {
   @override
   void didUpdateWidget(covariant _SetRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.setData != widget.setData) {
+    // Only reinitialize when it's a completely different set (e.g. reorder)
+    if (oldWidget.setData['set_id'] != widget.setData['set_id']) {
+      _weightCtrl.dispose();
+      _repsCtrl.dispose();
       _initVals();
     }
   }
-  
+
   void _initVals() {
     final w = widget.setData['weight'] as num? ?? 0;
     final r = widget.setData['reps'] as int? ?? 0;
@@ -584,85 +707,100 @@ class _SetRowState extends State<_SetRow> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _completed ? Colors.blue.withValues(alpha: 0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+    return Dismissible(
+      key: ValueKey('dismiss_set_${widget.setData['set_id']}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.delete, color: Colors.white, size: 20),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      margin: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 40,
-            child: Center(
-              child: Text(
-                "${widget.setNumber}",
-                style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 40,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                controller: _weightCtrl,
-                textAlign: TextAlign.center,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: const InputDecoration(
-                  hintText: "0",
-                  hintStyle: TextStyle(color: Colors.white24),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+      onDismissed: (_) => widget.onDelete(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _completed ? Colors.blue.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        margin: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 40,
+              child: Center(
+                child: Text(
+                  "${widget.setNumber}",
+                  style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
                 ),
-                onChanged: (_) => _dispatchChange(),
               ),
             ),
-          ),
-          Expanded(
-            child: Container(
-              height: 40,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                controller: _repsCtrl,
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: widget.exerciseType == "seconds" ? "0s" : "0",
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            Expanded(
+              child: Container(
+                height: 40,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                onChanged: (_) => _dispatchChange(),
+                child: TextField(
+                  controller: _weightCtrl,
+                  textAlign: TextAlign.center,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: const InputDecoration(
+                    hintText: "0",
+                    hintStyle: TextStyle(color: Colors.white24),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (_) => _dispatchChange(),
+                ),
               ),
             ),
-          ),
-          SizedBox(
-            width: 48,
-            child: IconButton(
-              onPressed: () {
-                setState(() => _completed = !_completed);
-                _dispatchChange();
-              },
-              icon: Icon(
-                _completed ? Icons.check_circle : Icons.radio_button_unchecked,
-                color: _completed ? Colors.green : Colors.white38,
-                size: 24,
+            Expanded(
+              child: Container(
+                height: 40,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextField(
+                  controller: _repsCtrl,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: widget.exerciseType == "seconds" ? "0s" : "0",
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (_) => _dispatchChange(),
+                ),
               ),
             ),
-          ),
-        ],
+            SizedBox(
+              width: 48,
+              child: IconButton(
+                onPressed: () {
+                  setState(() => _completed = !_completed);
+                  _dispatchChange();
+                },
+                icon: Icon(
+                  _completed ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: _completed ? Colors.green : Colors.white38,
+                  size: 24,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -707,4 +845,21 @@ class _ExerciseAvatar extends StatelessWidget {
     final file = File('${dir.path}/$local_images/$imageName');
     return file.existsSync() ? file : null;
   }
+}
+
+// ================================================================
+//  TOP-LEVEL FUNCTION FOR COMPUTE ISOLATE
+// ================================================================
+
+/// Deep-copies exercise + set data. Runs in a background isolate via compute().
+List<Map<String, dynamic>> _deepCopyExercises(List<Map<String, dynamic>> rawData) {
+  final List<Map<String, dynamic>> result = [];
+  for (var ex in rawData) {
+    final sets = (ex['sets'] as List).cast<Map<String, dynamic>>();
+    result.add({
+      ...ex,
+      'sets': sets.map((s) => Map<String, dynamic>.from(s)).toList(),
+    });
+  }
+  return result;
 }

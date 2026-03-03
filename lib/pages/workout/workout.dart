@@ -21,7 +21,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
   List<Map<String, dynamic>> _routines = [];
   List<Map<String, dynamic>> _sessions = [];
   bool _loadingRoutines = true;
-  
+
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay = DateTime.now();
   double _maxVolume = 1;
@@ -149,7 +149,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       firstDay: DateTime.utc(2020, 1, 1),
                       lastDay: DateTime.utc(2030, 12, 31),
                       focusedDay: _focusedDay,
-                      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                      calendarFormat: CalendarFormat.week,
+                      availableCalendarFormats: const {
+                        CalendarFormat.week: 'Week',
+                      },
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDay, day),
                       onDaySelected: (selectedDay, focusedDay) {
                         setState(() {
                           _selectedDay = selectedDay;
@@ -159,9 +164,19 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       headerStyle: const HeaderStyle(
                         formatButtonVisible: false,
                         titleCentered: true,
-                        titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                        titleTextStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        leftChevronIcon: Icon(
+                          Icons.chevron_left,
+                          color: Colors.white,
+                        ),
+                        rightChevronIcon: Icon(
+                          Icons.chevron_right,
+                          color: Colors.white,
+                        ),
                       ),
                       daysOfWeekStyle: const DaysOfWeekStyle(
                         weekdayStyle: TextStyle(color: Colors.white70),
@@ -173,17 +188,28 @@ class _WorkoutPageState extends State<WorkoutPage> {
                         weekendTextStyle: TextStyle(color: Colors.white),
                       ),
                       calendarBuilders: CalendarBuilders(
-                        defaultBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false),
-                        todayBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false, isToday: true),
-                        selectedBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: true),
+                        defaultBuilder: (context, day, focusedDay) =>
+                            _buildCalendarCell(day, isSelected: false),
+                        todayBuilder: (context, day, focusedDay) =>
+                            _buildCalendarCell(
+                              day,
+                              isSelected: false,
+                              isToday: true,
+                            ),
+                        selectedBuilder: (context, day, focusedDay) =>
+                            _buildCalendarCell(day, isSelected: true),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // ================= SELECTED DAY SESSIONS =================
-                  ..._getSessionsForDay(_selectedDay ?? DateTime.now()).map((s) => _buildSessionTile(s)),
-                  if (_getSessionsForDay(_selectedDay ?? DateTime.now()).isEmpty)
+                  ..._getSessionsForDay(
+                    _selectedDay ?? DateTime.now(),
+                  ).map((s) => _buildSessionTile(s)),
+                  if (_getSessionsForDay(
+                    _selectedDay ?? DateTime.now(),
+                  ).isEmpty)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
@@ -204,7 +230,11 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   // ================= COLLAPSIBLE HEADER =================
 
-  Widget _buildCollapsibleHeader(String title, bool expanded, VoidCallback onTap) {
+  Widget _buildCollapsibleHeader(
+    String title,
+    bool expanded,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -228,9 +258,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                expanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
+                expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                 color: Colors.white70,
                 size: 20,
               ),
@@ -250,7 +278,11 @@ class _WorkoutPageState extends State<WorkoutPage> {
     }).toList();
   }
 
-  Widget _buildCalendarCell(DateTime day, {required bool isSelected, bool isToday = false}) {
+  Widget _buildCalendarCell(
+    DateTime day, {
+    required bool isSelected,
+    bool isToday = false,
+  }) {
     final daySessions = _getSessionsForDay(day);
     double dailyVolume = 0;
     for (var s in daySessions) {
@@ -289,7 +321,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
         children: [
           Text(
             '${day.day}',
-            style: TextStyle(color: textColor, fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal),
+            style: TextStyle(
+              color: textColor,
+              fontWeight: isSelected || isToday
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+            ),
           ),
           if (hasSession) ...[
             const SizedBox(height: 2),
@@ -310,7 +347,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
   // ================= SESSION TILE =================
 
   Widget _buildSessionTile(Map<String, dynamic> session) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(session['started_at'] as int);
+    final dt = DateTime.fromMillisecondsSinceEpoch(
+      session['started_at'] as int,
+    );
     final dateStr =
         "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
     final runtime = session['completed_at'] != null
@@ -331,12 +370,17 @@ class _WorkoutPageState extends State<WorkoutPage> {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       onDismissed: (_) async {
-        await WorkoutDatabaseService.instance.deleteSession(session['session_id'] as int);
+        await WorkoutDatabaseService.instance.deleteSession(
+          session['session_id'] as int,
+        );
         _loadSessions();
       },
       child: GestureDetector(
         onTap: () {
-          _openSession(session['session_id'] as int, session['routine_name'] as String? ?? "Workout");
+          _openSession(
+            session['session_id'] as int,
+            session['routine_name'] as String? ?? "Workout",
+          );
         },
         child: Container(
           width: double.infinity,
@@ -355,7 +399,11 @@ class _WorkoutPageState extends State<WorkoutPage> {
                   color: Colors.grey.shade900,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.fitness_center, color: Colors.blueAccent, size: 20),
+                child: const Icon(
+                  Icons.fitness_center,
+                  color: Colors.blueAccent,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -373,7 +421,10 @@ class _WorkoutPageState extends State<WorkoutPage> {
                     const SizedBox(height: 4),
                     Text(
                       "$dateStr$runtime",
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -425,8 +476,10 @@ class _WorkoutPageState extends State<WorkoutPage> {
   // ================= ACTIONS =================
 
   Future<void> _startSession(Map<String, dynamic> routine) async {
-    final sessionId = await WorkoutDatabaseService.instance
-        .startSession(routine["routine_id"], startedAt: _selectedDay);
+    final sessionId = await WorkoutDatabaseService.instance.startSession(
+      routine["routine_id"],
+      startedAt: _selectedDay,
+    );
 
     if (!mounted) return;
 

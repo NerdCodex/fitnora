@@ -1,9 +1,16 @@
+import 'dart:io';
+import 'dart:math';
+
 import 'package:fitnora/components/alert.dart';
+import 'package:fitnora/components/custom_image_picker.dart';
 import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/components/dialog.dart';
+import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class AddMeasurementPage extends StatefulWidget {
   final int? measurementId;
@@ -23,6 +30,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
   final _hipsCtrl = TextEditingController();
   bool _isEdit = false;
   bool _isLoading = false;
+
+  String _imagePath = "";
+  bool _imageChanged = false;
 
   @override
   void initState() {
@@ -44,6 +54,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
         _chestCtrl.text = m['chest']?.toString() ?? '';
         _waistCtrl.text = m['waist']?.toString() ?? '';
         _hipsCtrl.text = m['hips']?.toString() ?? '';
+        _imagePath = m['progress_image']?.toString() ?? '';
         _isLoading = false;
       });
     }
@@ -91,6 +102,20 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                         style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 20),
+
+                      // ============ PROGRESS IMAGE ============
+                      Center(
+                        child: CustomImagePicker(
+                          initialImage: _imagePath,
+                          onChange: (path) {
+                            setState(() {
+                              _imagePath = path;
+                              _imageChanged = true;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
                       FormLabel(text: "Weight (kg) *"),
                       AppTextField(
@@ -165,6 +190,20 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
       return;
     }
 
+    String savedImageFileName = _imagePath;
+    String oldImageFileName = "";
+
+    // If editing, keep reference of old image
+    if (_isEdit) {
+      final old = await WorkoutDatabaseService.instance.getMeasurement(widget.measurementId!);
+      oldImageFileName = old?['progress_image']?.toString() ?? "";
+    }
+
+    // If image changed → save new image
+    if (_imageChanged && _imagePath.isNotEmpty) {
+      savedImageFileName = await _saveImage(File(_imagePath));
+    }
+
     final Map<String, dynamic> data = {
       'weight': weight,
       'height': double.tryParse(_heightCtrl.text.trim()),
@@ -172,11 +211,19 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
       'chest': double.tryParse(_chestCtrl.text.trim()),
       'waist': double.tryParse(_waistCtrl.text.trim()),
       'hips': double.tryParse(_hipsCtrl.text.trim()),
+      'progress_image': savedImageFileName,
     };
 
     if (_isEdit) {
       data['measurement_id'] = widget.measurementId!;
       await WorkoutDatabaseService.instance.updateMeasurement(data);
+
+      // Delete old image AFTER successful update
+      if (_imageChanged &&
+          oldImageFileName.isNotEmpty &&
+          oldImageFileName != savedImageFileName) {
+        await _deleteImage(oldImageFileName);
+      }
     } else {
       if (widget.measuredDate != null) {
         data['measured_at'] = widget.measuredDate!.millisecondsSinceEpoch;
@@ -188,12 +235,45 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
     Navigator.pop(context, true);
   }
 
+  Future<String> _saveImage(File imageFile) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory(p.join(appDir.path, local_images));
+
+    if (!await imagesDir.exists()) {
+      await imagesDir.create(recursive: true);
+    }
+
+    final randomInt = Random().nextInt(999999999);
+    final fileName =
+        "progress_image_$randomInt${p.extension(imageFile.path)}";
+    final savedPath = p.join(imagesDir.path, fileName);
+
+    await imageFile.copy(savedPath);
+    return fileName;
+  }
+
+  Future<void> _deleteImage(String fileName) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final filePath = p.join(dir.path, local_images, fileName);
+      final file = File(filePath);
+
+      if (await file.exists()) {
+        await file.delete();
+        debugPrint("Deleted old progress image: $fileName");
+      }
+    } catch (e) {
+      debugPrint("Image delete error: $e");
+    }
+  }
+
   void _goBack(bool didPop, dynamic result) async {
     if (didPop) return;
 
     final hasInput = _weightCtrl.text.isNotEmpty ||
         _heightCtrl.text.isNotEmpty ||
-        _bodyFatCtrl.text.isNotEmpty;
+        _bodyFatCtrl.text.isNotEmpty ||
+        _imageChanged;
 
     if (!hasInput) {
       Navigator.pop(context);
