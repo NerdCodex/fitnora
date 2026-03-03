@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 
 class AddMeasurementPage extends StatefulWidget {
   final int? measurementId;
-  const AddMeasurementPage({super.key, this.measurementId});
+  final DateTime? measuredDate;
+  const AddMeasurementPage({super.key, this.measurementId, this.measuredDate});
 
   @override
   State<AddMeasurementPage> createState() => _AddMeasurementPageState();
@@ -177,6 +178,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
       data['measurement_id'] = widget.measurementId!;
       await WorkoutDatabaseService.instance.updateMeasurement(data);
     } else {
+      if (widget.measuredDate != null) {
+        data['measured_at'] = widget.measuredDate!.millisecondsSinceEpoch;
+      }
       await WorkoutDatabaseService.instance.addMeasurement(data);
     }
 

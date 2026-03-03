@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:fitnora/components/alert.dart';
@@ -25,12 +24,14 @@ class StartSessionPage extends StatefulWidget {
 class _StartSessionPageState extends State<StartSessionPage> {
   List<Map<String, dynamic>> _exercises = [];
   bool _loading = true;
-
-  // Timer & State
-  late Stopwatch _stopwatch;
-  Timer? _timer;
-  String _elapsed = "00:00";
   bool _isCompleted = false;
+  bool _hasChanges = false;
+
+  DateTime _sessionDate = DateTime.now();
+  TimeOfDay _startTime = TimeOfDay.now();
+  TimeOfDay _endTime = TimeOfDay.now();
+
+  final List<int> _addedSetIds = [];
 
   @override
   void initState() {
@@ -39,47 +40,54 @@ class _StartSessionPageState extends State<StartSessionPage> {
   }
 
   Future<void> _loadSessionInfo() async {
-    // Check if session is already completed
     final history = await WorkoutDatabaseService.instance.getSessionHistory();
-    // getSessionHistory only returns non-in_progress. So if it's there, it's done.
     final existing = history.where((s) => s['session_id'] == widget.sessionId).toList();
-    
+
     if (existing.isNotEmpty) {
       _isCompleted = true;
       final session = existing.first;
+      
       final startedAt = session['started_at'] as int;
-      final completedAt = session['completed_at'] as int?;
-      if (completedAt != null) {
-        final d = Duration(milliseconds: completedAt - startedAt);
-        _elapsed = "${d.inMinutes.toString().padLeft(2, '0')}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
+      final startDt = DateTime.fromMillisecondsSinceEpoch(startedAt);
+      _sessionDate = startDt;
+      _startTime = TimeOfDay.fromDateTime(startDt);
+
+      if (session['completed_at'] != null) {
+        final endDt = DateTime.fromMillisecondsSinceEpoch(session['completed_at'] as int);
+        _endTime = TimeOfDay.fromDateTime(endDt);
+      } else {
+        _endTime = TimeOfDay.now();
       }
     } else {
-      _isCompleted = false;
-      _stopwatch = Stopwatch()..start();
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted) return;
-        setState(() {
-          final d = _stopwatch.elapsed;
-          _elapsed =
-              "${d.inMinutes.toString().padLeft(2, '0')}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
-        });
-      });
+      // New session from DB (in_progress) 
+      final db = await WorkoutDatabaseService.instance.database;
+      final sessionRows = await db.query('workout_session', where: 'session_id = ?', whereArgs: [widget.sessionId]);
+      if (sessionRows.isNotEmpty) {
+        final startedAt = sessionRows.first['started_at'] as int;
+        final startDt = DateTime.fromMillisecondsSinceEpoch(startedAt);
+        _sessionDate = startDt;
+        _startTime = TimeOfDay.fromDateTime(startDt);
+        _endTime = TimeOfDay.now();
+      }
     }
 
     await _loadExercises();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    if (!_isCompleted) _stopwatch.stop();
-    super.dispose();
-  }
-
   Future<void> _loadExercises() async {
     try {
-      final data = await WorkoutDatabaseService.instance
-          .getSessionExercises(widget.sessionId);
+      final rawData = await WorkoutDatabaseService.instance.getSessionExercises(widget.sessionId);
+      
+      // Deep copy to allow in-memory modifications
+      final List<Map<String, dynamic>> data = [];
+      for (var ex in rawData) {
+        final sets = (ex['sets'] as List).cast<Map<String, dynamic>>();
+        data.add({
+          ...ex,
+          'sets': sets.map((s) => Map<String, dynamic>.from(s)).toList(),
+        });
+      }
+
       if (!mounted) return;
       setState(() {
         _exercises = data;
@@ -89,6 +97,53 @@ class _StartSessionPageState extends State<StartSessionPage> {
       debugPrint("LOAD SESSION ERROR: $e");
       if (!mounted) return;
       setState(() => _loading = false);
+    }
+  }
+
+  void _markChanged() {
+    if (!_hasChanges) {
+      setState(() => _hasChanges = true);
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final dt = await showDatePicker(
+      context: context,
+      initialDate: _sessionDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.dark(primary: Colors.blue, surface: Colors.grey.shade900),
+        ),
+        child: child!,
+      ),
+    );
+    if (dt != null && dt != _sessionDate) {
+      setState(() {
+        _sessionDate = dt;
+        _markChanged();
+      });
+    }
+  }
+
+  Future<void> _pickTime(bool isStart) async {
+    final tm = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _startTime : _endTime,
+      builder: (context, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.dark(primary: Colors.blue, surface: Colors.grey.shade900),
+        ),
+        child: child!,
+      ),
+    );
+    if (tm != null) {
+      setState(() {
+        if (isStart) _startTime = tm;
+        else _endTime = tm;
+        _markChanged();
+      });
     }
   }
 
@@ -104,57 +159,49 @@ class _StartSessionPageState extends State<StartSessionPage> {
           title: Text(widget.routineName),
           leading: BackButton(onPressed: () => _onBack(false, null)),
           actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.timer_outlined, size: 16, color: Colors.blue),
-                  const SizedBox(width: 4),
-                  Text(
-                    _elapsed,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            if (_isCompleted)
+              TextButton(
+                onPressed: _hasChanges ? _saveSession : null,
+                child: Text(
+                  "Save",
+                  style: TextStyle(color: _hasChanges ? Colors.blue : Colors.grey),
+                ),
+              )
           ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
-            : _exercises.isEmpty
-                ? const Center(
-                    child: Text(
-                      "No exercises in this session",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    itemCount: _exercises.length,
-                    itemBuilder: (context, index) {
-                      return _ExerciseCard(
-                        exercise: _exercises[index],
-                        onUpdate: _loadExercises,
-                      );
-                    },
+            : Column(
+                children: [
+                  _buildMetadataCard(),
+                  Expanded(
+                    child: _exercises.isEmpty
+                        ? const Center(
+                            child: Text(
+                              "No exercises in this session",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                            itemCount: _exercises.length,
+                            itemBuilder: (context, index) {
+                              return _ExerciseCard(
+                                exercise: _exercises[index],
+                                onAddSet: (seId) => _addNewSet(index, seId),
+                                onSetChanged: (setIndex, setData) => _updateSetInfo(index, setIndex, setData),
+                              );
+                            },
+                          ),
                   ),
+                ],
+              ),
         bottomNavigationBar: _loading || _isCompleted
             ? null
             : SafeArea(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -172,7 +219,125 @@ class _StartSessionPageState extends State<StartSessionPage> {
     );
   }
 
-  // ================= FINISH =================
+  Widget _buildMetadataCard() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Date
+          GestureDetector(
+            onTap: _pickDate,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Date", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(
+                  "${_sessionDate.day.toString().padLeft(2, '0')}/${_sessionDate.month.toString().padLeft(2, '0')}/${_sessionDate.year}",
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                )
+              ],
+            ),
+          ),
+          Container(width: 1, height: 30, color: Colors.white12),
+          // Start Time
+          GestureDetector(
+            onTap: () => _pickTime(true),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Start", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(
+                  _startTime.format(context),
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                )
+              ],
+            ),
+          ),
+          Container(width: 1, height: 30, color: Colors.white12),
+          // End Time
+          GestureDetector(
+            onTap: () => _pickTime(false),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("End", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(
+                  _endTime.format(context),
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= STATE MUTATION =================
+
+  Future<void> _addNewSet(int exerciseIndex, int sessionExerciseId) async {
+    // We add to DB to get an ID quickly, but we mark it as added so we delete on discard
+    final setId = await WorkoutDatabaseService.instance.addSessionSet(sessionExerciseId);
+    _addedSetIds.add(setId);
+
+    final ex = _exercises[exerciseIndex];
+    final sets = ex['sets'] as List<Map<String, dynamic>>;
+    
+    // Add default empty set to memory
+    setState(() {
+      sets.add({
+        'set_id': setId,
+        'session_exercise_id': sessionExerciseId,
+        'set_order': sets.length + 1,
+        'weight': 0.0,
+        'reps': 0,
+        'is_completed': 0,
+      });
+      _markChanged();
+    });
+  }
+
+  void _updateSetInfo(int exerciseIndex, int setIndex, Map<String, dynamic> newSetData) {
+    _exercises[exerciseIndex]['sets'][setIndex] = newSetData;
+    _markChanged();
+  }
+
+  // ================= SAVE DATA =================
+
+  Future<void> _flushToDB() async {
+    // Save metadata
+    final startDt = DateTime(_sessionDate.year, _sessionDate.month, _sessionDate.day, _startTime.hour, _startTime.minute);
+    final endDt = DateTime(_sessionDate.year, _sessionDate.month, _sessionDate.day, _endTime.hour, _endTime.minute);
+
+    await WorkoutDatabaseService.instance.completeSession(
+      widget.sessionId,
+      startedAt: startDt.millisecondsSinceEpoch,
+      completedAt: endDt.millisecondsSinceEpoch,
+    );
+
+    // Save in-memory sets to DB
+    for (final ex in _exercises) {
+      final sets = ex['sets'] as List<Map<String, dynamic>>;
+      for (final s in sets) {
+        await WorkoutDatabaseService.instance.updateSessionSet(
+          setId: s['set_id'],
+          weight: (s['weight'] as num).toDouble(),
+          reps: s['reps'] as int,
+          isCompleted: (s['is_completed'] as int) == 1,
+        );
+      }
+    }
+  }
 
   Future<void> _finishWorkout() async {
     final confirm = await showConfirmDialog(
@@ -183,12 +348,23 @@ class _StartSessionPageState extends State<StartSessionPage> {
       falseText: "CONTINUE",
     );
 
-    if (confirm != true) return;
+    if (confirm != true || !mounted) return;
 
-    await WorkoutDatabaseService.instance.completeSession(widget.sessionId);
+    await _flushToDB();
 
     if (!mounted) return;
-    showMessageDialog(context, "Workout completed! 💪", () {
+    showMessageDialog(context, "Workout completed!", () {
+      Navigator.pop(context, true);
+    });
+  }
+
+  Future<void> _saveSession() async {
+    if (!_hasChanges) return;
+    
+    await _flushToDB();
+    
+    if (!mounted) return;
+    showMessageDialog(context, "Changes saved!", () {
       Navigator.pop(context, true);
     });
   }
@@ -198,24 +374,39 @@ class _StartSessionPageState extends State<StartSessionPage> {
   void _onBack(bool didPop, dynamic result) async {
     if (didPop) return;
 
-    if (_isCompleted) {
-      if (mounted) {
-        Navigator.pop(context, true);
+    if (!_hasChanges) {
+      if (!_isCompleted) {
+        // Abandon totally untouched new session silently
+        await WorkoutDatabaseService.instance.deleteSession(widget.sessionId);
       }
+      if (mounted) Navigator.pop(context, true);
       return;
     }
 
+    final String title = _isCompleted ? "Discard changes?" : "Abandon workout?";
+    final String msg = _isCompleted 
+        ? "You have unsaved changes. Discard them?"
+        : "If you leave now, this session will be deleted.";
+    final String confirmBtn = _isCompleted ? "DISCARD" : "ABANDON";
+
     final exit = await showConfirmDialog(
       context,
-      title: "Abandon workout?",
-      content:
-          "If you leave now, this session will be saved as abandoned.",
-      trueText: "ABANDON",
+      title: title,
+      content: msg,
+      trueText: confirmBtn,
       falseText: "CONTINUE",
     );
 
     if (exit == true) {
-      await WorkoutDatabaseService.instance.abandonSession(widget.sessionId);
+      // Discard changes
+      if (!_isCompleted) {
+        await WorkoutDatabaseService.instance.deleteSession(widget.sessionId);
+      } else {
+        // Rollback any sets created during editing
+        for (final id in _addedSetIds) {
+          await WorkoutDatabaseService.instance.deleteSessionSet(id);
+        }
+      }
       if (mounted) {
         Navigator.pop(context, true);
       }
@@ -227,21 +418,20 @@ class _StartSessionPageState extends State<StartSessionPage> {
 //  EXERCISE CARD (internal widget)
 // ================================================================
 
-class _ExerciseCard extends StatefulWidget {
+class _ExerciseCard extends StatelessWidget {
   final Map<String, dynamic> exercise;
-  final VoidCallback onUpdate;
+  final Function(int sessionExerciseId) onAddSet;
+  final Function(int setIndex, Map<String, dynamic> updatedData) onSetChanged;
 
-  const _ExerciseCard({required this.exercise, required this.onUpdate});
+  const _ExerciseCard({
+    required this.exercise,
+    required this.onAddSet,
+    required this.onSetChanged,
+  });
 
-  @override
-  State<_ExerciseCard> createState() => _ExerciseCardState();
-}
-
-class _ExerciseCardState extends State<_ExerciseCard> {
   @override
   Widget build(BuildContext context) {
-    final ex = widget.exercise;
-    final sets = (ex['sets'] as List<Map<String, dynamic>>?) ?? [];
+    final sets = (exercise['sets'] as List<Map<String, dynamic>>?) ?? [];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -256,26 +446,19 @@ class _ExerciseCardState extends State<_ExerciseCard> {
           // Exercise Header
           Row(
             children: [
-              _ExerciseAvatar(imageName: ex['exercise_image'] as String?),
+              _ExerciseAvatar(imageName: exercise['exercise_image'] as String?),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      ex['exercise_name'] ?? '',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      exercise['exercise_name'] ?? '',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      "${ex['exercise_equipment']} · ${ex['exercise_type']}",
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 13,
-                      ),
+                      "${exercise['exercise_equipment']} · ${exercise['exercise_type']}",
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                     ),
                   ],
                 ),
@@ -289,16 +472,8 @@ class _ExerciseCardState extends State<_ExerciseCard> {
           Row(
             children: [
               const SizedBox(width: 40, child: Text("SET", style: _headerStyle)),
-              const Expanded(
-                child: Center(
-                  child: Text("KG", style: _headerStyle),
-                ),
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(ex['exercise_type'] == "seconds" ? "SECS" : "REPS", style: _headerStyle),
-                ),
-              ),
+              const Expanded(child: Center(child: Text("KG", style: _headerStyle))),
+              Expanded(child: Center(child: Text(exercise['exercise_type'] == "seconds" ? "SECS" : "REPS", style: _headerStyle))),
               const SizedBox(width: 48, child: Center(child: Text("✓", style: _headerStyle))),
             ],
           ),
@@ -307,12 +482,11 @@ class _ExerciseCardState extends State<_ExerciseCard> {
 
           // Set Rows
           ...sets.asMap().entries.map((entry) {
-            final setData = entry.value;
             return _SetRow(
               setNumber: entry.key + 1,
-              setData: setData,
-              onUpdate: widget.onUpdate,
-              exerciseType: ex['exercise_type'] as String? ?? 'reps',
+              setData: entry.value,
+              exerciseType: exercise['exercise_type'] as String? ?? 'reps',
+              onChanged: (newData) => onSetChanged(entry.key, newData),
             );
           }),
 
@@ -321,7 +495,7 @@ class _ExerciseCardState extends State<_ExerciseCard> {
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(
-              onPressed: () => _addSet(ex['session_exercise_id']),
+              onPressed: () => onAddSet(exercise['session_exercise_id']),
               icon: const Icon(Icons.add, size: 18),
               label: const Text("Add Set"),
               style: TextButton.styleFrom(foregroundColor: Colors.blue),
@@ -330,11 +504,6 @@ class _ExerciseCardState extends State<_ExerciseCard> {
         ],
       ),
     );
-  }
-
-  Future<void> _addSet(int sessionExerciseId) async {
-    await WorkoutDatabaseService.instance.addSessionSet(sessionExerciseId);
-    widget.onUpdate();
   }
 }
 
@@ -352,14 +521,14 @@ const _headerStyle = TextStyle(
 class _SetRow extends StatefulWidget {
   final int setNumber;
   final Map<String, dynamic> setData;
-  final VoidCallback onUpdate;
   final String exerciseType;
+  final Function(Map<String, dynamic>) onChanged;
 
   const _SetRow({
     required this.setNumber,
     required this.setData,
-    required this.onUpdate,
     required this.exerciseType,
+    required this.onChanged,
   });
 
   @override
@@ -374,23 +543,23 @@ class _SetRowState extends State<_SetRow> {
   @override
   void initState() {
     super.initState();
-    final w = widget.setData['weight'] as num? ?? 0;
-    final r = widget.setData['reps'] as int? ?? 0;
-    _weightCtrl = TextEditingController(text: w > 0 ? w.toString() : '');
-    _repsCtrl = TextEditingController(text: r > 0 ? r.toString() : '');
-    _completed = (widget.setData['is_completed'] as int? ?? 0) == 1;
+    _initVals();
   }
 
   @override
   void didUpdateWidget(covariant _SetRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.setData['set_id'] != widget.setData['set_id']) {
-      final w = widget.setData['weight'] as num? ?? 0;
-      final r = widget.setData['reps'] as int? ?? 0;
-      _weightCtrl.text = w > 0 ? w.toString() : '';
-      _repsCtrl.text = r > 0 ? r.toString() : '';
-      _completed = (widget.setData['is_completed'] as int? ?? 0) == 1;
+    if (oldWidget.setData != widget.setData) {
+      _initVals();
     }
+  }
+  
+  void _initVals() {
+    final w = widget.setData['weight'] as num? ?? 0;
+    final r = widget.setData['reps'] as int? ?? 0;
+    _weightCtrl = TextEditingController(text: w > 0 ? w.toString() : '');
+    _repsCtrl = TextEditingController(text: r > 0 ? r.toString() : '');
+    _completed = (widget.setData['is_completed'] as int? ?? 0) == 1;
   }
 
   @override
@@ -400,24 +569,17 @@ class _SetRowState extends State<_SetRow> {
     super.dispose();
   }
 
-  Future<void> _save({bool? toggleComplete}) async {
-    final weight = double.tryParse(_weightCtrl.text) ?? 0;
+  void _dispatchChange() {
+    final weight = double.tryParse(_weightCtrl.text) ?? 0.0;
     final reps = int.tryParse(_repsCtrl.text) ?? 0;
 
-    if (toggleComplete != null) {
-      _completed = toggleComplete;
-    }
-
-    await WorkoutDatabaseService.instance.updateSessionSet(
-      setId: widget.setData['set_id'] as int,
-      weight: weight,
-      reps: reps,
-      isCompleted: _completed,
-    );
-
-    if (toggleComplete != null) {
-      widget.onUpdate();
-    }
+    final newData = {
+      ...widget.setData,
+      'weight': weight,
+      'reps': reps,
+      'is_completed': _completed ? 1 : 0,
+    };
+    widget.onChanged(newData);
   }
 
   @override
@@ -436,10 +598,7 @@ class _SetRowState extends State<_SetRow> {
             child: Center(
               child: Text(
                 "${widget.setNumber}",
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -462,7 +621,7 @@ class _SetRowState extends State<_SetRow> {
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
-                onChanged: (_) => _save(),
+                onChanged: (_) => _dispatchChange(),
               ),
             ),
           ),
@@ -485,7 +644,7 @@ class _SetRowState extends State<_SetRow> {
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-                onChanged: (_) => _save(),
+                onChanged: (_) => _dispatchChange(),
               ),
             ),
           ),
@@ -493,15 +652,11 @@ class _SetRowState extends State<_SetRow> {
             width: 48,
             child: IconButton(
               onPressed: () {
-                setState(() {
-                  _completed = !_completed;
-                });
-                _save(toggleComplete: _completed);
+                setState(() => _completed = !_completed);
+                _dispatchChange();
               },
               icon: Icon(
-                _completed
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
+                _completed ? Icons.check_circle : Icons.radio_button_unchecked,
                 color: _completed ? Colors.green : Colors.white38,
                 size: 24,
               ),

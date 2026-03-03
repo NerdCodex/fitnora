@@ -476,14 +476,14 @@ class WorkoutDatabaseService {
   /// Start a new workout session from a routine.
   /// Copies routine_exercises into session_exercises and creates one
   /// default empty set per exercise.
-  Future<int> startSession(int routineId) async {
+  Future<int> startSession(int routineId, {DateTime? startedAt}) async {
     final db = await database;
 
     return await db.transaction((txn) async {
       // 1. Create the session record
       final sessionId = await txn.insert('workout_session', {
         'routine_id': routineId,
-        'started_at': DateTime.now().millisecondsSinceEpoch,
+        'started_at': (startedAt ?? DateTime.now()).millisecondsSinceEpoch,
         'status': 'in_progress',
       });
 
@@ -606,19 +606,21 @@ class WorkoutDatabaseService {
     await db.delete(
       'session_set',
       where: 'set_id = ?',
-      whereArgs: [setId],
+        whereArgs: [setId],
     );
   }
 
   /// Complete a workout session.
-  Future<void> completeSession(int sessionId) async {
+  Future<void> completeSession(int sessionId, {int? startedAt, int? completedAt}) async {
     final db = await database;
+    final updates = <String, dynamic>{
+      'status': 'completed',
+    };
+    if (startedAt != null) updates['started_at'] = startedAt;
+    updates['completed_at'] = completedAt ?? DateTime.now().millisecondsSinceEpoch;
     await db.update(
       'workout_session',
-      {
-        'completed_at': DateTime.now().millisecondsSinceEpoch,
-        'status': 'completed',
-      },
+      updates,
       where: 'session_id = ?',
       whereArgs: [sessionId],
     );
@@ -680,7 +682,7 @@ class WorkoutDatabaseService {
       'chest': data['chest'],
       'waist': data['waist'],
       'hips': data['hips'],
-      'measured_at': DateTime.now().millisecondsSinceEpoch,
+      'measured_at': data['measured_at'] ?? DateTime.now().millisecondsSinceEpoch,
     });
   }
 

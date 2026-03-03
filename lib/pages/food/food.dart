@@ -5,6 +5,7 @@ import 'package:fitnora/pages/food/log_meal.dart';
 import 'package:fitnora/pages/food/view_foods.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -14,6 +15,7 @@ class FoodPage extends StatefulWidget {
 }
 
 class _FoodPageState extends State<FoodPage> {
+  DateTime _focusedDate = DateTime.now();
   DateTime _selectedDate = DateTime.now();
   Map<String, double> _nutrition = {
     'calories': 0,
@@ -22,6 +24,7 @@ class _FoodPageState extends State<FoodPage> {
     'fat': 0,
   };
   List<Map<String, dynamic>> _meals = [];
+  Set<String> _trackedFoodDates = {}; // 'yyyy-MM-dd' strings for quick lookup
   bool _loading = true;
 
   @override
@@ -36,10 +39,19 @@ class _FoodPageState extends State<FoodPage> {
         .getDailyNutritionSummary(_selectedDate);
     final meals =
         await WorkoutDatabaseService.instance.getMealsByDate(_selectedDate);
+    // Load all tracked dates for dot indicators
+    final allHistory = await WorkoutDatabaseService.instance.getNutritionHistory();
+    final trackedDates = <String>{};
+    for (var n in allHistory) {
+      final ts = (n['logged_at'] as num).toInt();
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts);
+      trackedDates.add('${dt.year}-${dt.month}-${dt.day}');
+    }
     if (!mounted) return;
     setState(() {
       _nutrition = nutrition;
       _meals = meals;
+      _trackedFoodDates = trackedDates;
       _loading = false;
     });
   }
@@ -66,8 +78,50 @@ class _FoodPageState extends State<FoodPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ================= DATE PICKER =================
-                  _buildDateRow(),
+                  // ================= WEEKLY CALENDAR =================
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: TableCalendar(
+                      firstDay: DateTime.utc(2020, 1, 1),
+                      lastDay: DateTime.now().add(const Duration(days: 365)),
+                      focusedDay: _focusedDate,
+                      calendarFormat: CalendarFormat.week,
+                      availableCalendarFormats: const {CalendarFormat.week: 'Week'},
+                      selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                      onDaySelected: (selectedDay, focusedDay) {
+                        setState(() {
+                          _selectedDate = selectedDay;
+                          _focusedDate = focusedDay;
+                        });
+                        _loadData();
+                      },
+                      headerStyle: const HeaderStyle(
+                        formatButtonVisible: false,
+                        titleCentered: true,
+                        titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                      ),
+                      daysOfWeekStyle: const DaysOfWeekStyle(
+                        weekdayStyle: TextStyle(color: Colors.white70),
+                        weekendStyle: TextStyle(color: Colors.white70),
+                      ),
+                      calendarStyle: const CalendarStyle(
+                        outsideDaysVisible: false,
+                        defaultTextStyle: TextStyle(color: Colors.white),
+                        weekendTextStyle: TextStyle(color: Colors.white),
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        defaultBuilder: (context, day, focusedDay) => _buildFoodCalendarCell(day, isSelected: false),
+                        todayBuilder: (context, day, focusedDay) => _buildFoodCalendarCell(day, isSelected: false, isToday: true),
+                        selectedBuilder: (context, day, focusedDay) => _buildFoodCalendarCell(day, isSelected: true),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
 
                   // ================= NUTRITION SUMMARY =================
@@ -90,77 +144,44 @@ class _FoodPageState extends State<FoodPage> {
       ),
     );
   }
+  // ================= FOOD CALENDAR CELL =================
 
-  // ================= DATE ROW =================
+  Widget _buildFoodCalendarCell(DateTime day, {required bool isSelected, bool isToday = false}) {
+    final key = '${day.year}-${day.month}-${day.day}';
+    final hasTracking = _trackedFoodDates.contains(key);
 
-  Widget _buildDateRow() {
-    final now = DateTime.now();
-    final isToday = _selectedDate.year == now.year &&
-        _selectedDate.month == now.month &&
-        _selectedDate.day == now.day;
-
-    final dateStr = isToday
-        ? "Today"
-        : "${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}";
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          onPressed: () => _changeDate(-1),
-          icon: const Icon(Icons.chevron_left, color: Colors.white),
-        ),
-        GestureDetector(
-          onTap: _pickDate,
-          child: Text(
-            dateStr,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+    return Container(
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.blue : Colors.transparent,
+        shape: BoxShape.circle,
+        border: isToday && !isSelected ? Border.all(color: Colors.blue) : null,
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${day.day}',
+            style: TextStyle(
+              color: isSelected ? Colors.white : (isToday ? Colors.blue : Colors.white),
+              fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-        ),
-        IconButton(
-          onPressed: isToday ? null : () => _changeDate(1),
-          icon: Icon(
-            Icons.chevron_right,
-            color: isToday ? Colors.grey.shade800 : Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _changeDate(int days) {
-    setState(() {
-      _selectedDate = _selectedDate.add(Duration(days: days));
-    });
-    _loadData();
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: Colors.blue,
-              surface: Colors.grey.shade900,
+          if (hasTracking) ...[
+            const SizedBox(height: 2),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.green,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          child: child!,
-        );
-      },
+          ],
+        ],
+      ),
     );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-      _loadData();
-    }
   }
 
   // ================= NUTRITION CARD =================

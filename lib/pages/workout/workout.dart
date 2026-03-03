@@ -6,6 +6,7 @@ import 'package:fitnora/pages/workout/routine/routine_card.dart';
 import 'package:fitnora/pages/workout/session/start_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 class WorkoutPage extends StatefulWidget {
   const WorkoutPage({super.key});
@@ -20,6 +21,10 @@ class _WorkoutPageState extends State<WorkoutPage> {
   List<Map<String, dynamic>> _routines = [];
   List<Map<String, dynamic>> _sessions = [];
   bool _loadingRoutines = true;
+  
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay = DateTime.now();
+  double _maxVolume = 1;
 
   @override
   void initState() {
@@ -133,19 +138,61 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
                 if (sessionsExpanded) ...[
                   const SizedBox(height: 12),
-
-                  if (_sessions.isEmpty)
+                  // ================= HEATMAP CALENDAR =================
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: TableCalendar(
+                      firstDay: DateTime.utc(2020, 1, 1),
+                      lastDay: DateTime.utc(2030, 12, 31),
+                      focusedDay: _focusedDay,
+                      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                      onDaySelected: (selectedDay, focusedDay) {
+                        setState(() {
+                          _selectedDay = selectedDay;
+                          _focusedDay = focusedDay;
+                        });
+                      },
+                      headerStyle: const HeaderStyle(
+                        formatButtonVisible: false,
+                        titleCentered: true,
+                        titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                      ),
+                      daysOfWeekStyle: const DaysOfWeekStyle(
+                        weekdayStyle: TextStyle(color: Colors.white70),
+                        weekendStyle: TextStyle(color: Colors.white70),
+                      ),
+                      calendarStyle: const CalendarStyle(
+                        outsideDaysVisible: false,
+                        defaultTextStyle: TextStyle(color: Colors.white),
+                        weekendTextStyle: TextStyle(color: Colors.white),
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        defaultBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false),
+                        todayBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false, isToday: true),
+                        selectedBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: true),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // ================= SELECTED DAY SESSIONS =================
+                  ..._getSessionsForDay(_selectedDay ?? DateTime.now()).map((s) => _buildSessionTile(s)),
+                  if (_getSessionsForDay(_selectedDay ?? DateTime.now()).isEmpty)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: Text(
-                          "No sessions recorded yet",
+                          "No sessions on this date",
                           style: TextStyle(color: Colors.grey),
                         ),
                       ),
-                    )
-                  else
-                    ..._sessions.map((s) => _buildSessionTile(s)),
+                    ),
                 ],
               ],
             ),
@@ -190,6 +237,72 @@ class _WorkoutPageState extends State<WorkoutPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ================= CALENDAR HELPERS =================
+
+  List<Map<String, dynamic>> _getSessionsForDay(DateTime day) {
+    return _sessions.where((s) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(s['started_at'] as int);
+      return isSameDay(dt, day);
+    }).toList();
+  }
+
+  Widget _buildCalendarCell(DateTime day, {required bool isSelected, bool isToday = false}) {
+    final daySessions = _getSessionsForDay(day);
+    double dailyVolume = 0;
+    for (var s in daySessions) {
+      dailyVolume += (s['total_volume'] as num?)?.toDouble() ?? 0;
+    }
+
+    // Heatmap color logic
+    Color bgColor = Colors.transparent;
+    Color textColor = Colors.white;
+
+    if (isSelected) {
+      bgColor = Colors.blue;
+      textColor = Colors.white;
+    } else if (dailyVolume > 0) {
+      // Scale opacity purely based on max volume (from 0.2 to 0.8)
+      double intensity = (dailyVolume / _maxVolume).clamp(0.0, 1.0);
+      double opacity = 0.2 + (intensity * 0.6);
+      bgColor = Colors.blueAccent.withValues(alpha: opacity);
+      textColor = Colors.white;
+    } else if (isToday) {
+      textColor = Colors.blue;
+    }
+
+    final hasSession = daySessions.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+        border: isToday && !isSelected ? Border.all(color: Colors.blue) : null,
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${day.day}',
+            style: TextStyle(color: textColor, fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal),
+          ),
+          if (hasSession) ...[
+            const SizedBox(height: 2),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.blueAccent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -296,9 +409,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Future<void> _loadSessions() async {
     final sessions = await WorkoutDatabaseService.instance.getSessionHistory();
+    double maxV = 1;
+    for (var s in sessions) {
+      final v = (s['total_volume'] as num?)?.toDouble() ?? 0;
+      if (v > maxV) maxV = v;
+    }
+
     if (!mounted) return;
     setState(() {
       _sessions = sessions;
+      _maxVolume = maxV;
     });
   }
 
@@ -306,7 +426,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Future<void> _startSession(Map<String, dynamic> routine) async {
     final sessionId = await WorkoutDatabaseService.instance
-        .startSession(routine["routine_id"]);
+        .startSession(routine["routine_id"], startedAt: _selectedDay);
 
     if (!mounted) return;
 

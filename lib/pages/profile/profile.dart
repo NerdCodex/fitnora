@@ -5,6 +5,7 @@ import 'package:fitnora/pages/profile/settings.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -19,6 +20,9 @@ class ProfilePageState extends State<ProfilePage> {
   List<Map<String, dynamic>> _sessions = [];
   List<Map<String, dynamic>> _nutritionHistory = [];
   String _selectedNutritionMetric = 'Calories'; // Calories | Protein | Carbs
+  
+  DateTime _focusedDate = DateTime.now();
+  DateTime _selectedDate = DateTime.now();
   bool _loading = true;
 
   @override
@@ -75,14 +79,56 @@ class ProfilePageState extends State<ProfilePage> {
 
                   const SizedBox(height: 24),
 
-                  // ================= MEASUREMENT HISTORY =================
+                  // ================= MEASUREMENT CALENDAR =================
                   _buildSectionHeader("Measurement History"),
                   const SizedBox(height: 12),
 
-                  if (_history.isEmpty)
-                    _buildEmptyState("No measurements recorded yet")
-                  else
-                    ..._history.map((m) => _buildHistoryTile(m)),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: TableCalendar(
+                      firstDay: DateTime.utc(2020, 1, 1),
+                      lastDay: DateTime.utc(2030, 12, 31),
+                      focusedDay: _focusedDate,
+                      selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                      onDaySelected: (selectedDay, focusedDay) {
+                        setState(() {
+                          _selectedDate = selectedDay;
+                          _focusedDate = focusedDay;
+                        });
+                      },
+                      headerStyle: const HeaderStyle(
+                        formatButtonVisible: false,
+                        titleCentered: true,
+                        titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                      ),
+                      daysOfWeekStyle: const DaysOfWeekStyle(
+                        weekdayStyle: TextStyle(color: Colors.white70),
+                        weekendStyle: TextStyle(color: Colors.white70),
+                      ),
+                      calendarStyle: const CalendarStyle(
+                        outsideDaysVisible: false,
+                        defaultTextStyle: TextStyle(color: Colors.white),
+                        weekendTextStyle: TextStyle(color: Colors.white),
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        defaultBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false),
+                        todayBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: false, isToday: true),
+                        selectedBuilder: (context, day, focusedDay) => _buildCalendarCell(day, isSelected: true),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // ================= SELECTED DAY MEASUREMENTS =================
+                  ..._getMeasurementsForDay(_selectedDate).map((m) => _buildHistoryTile(m)),
+                  if (_getMeasurementsForDay(_selectedDate).isEmpty)
+                    _buildEmptyState("No measurements on this date"),
 
                   const SizedBox(height: 24),
 
@@ -244,6 +290,52 @@ class ProfilePageState extends State<ProfilePage> {
             "$label ($unit)",
             style: const TextStyle(color: Colors.grey, fontSize: 12),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ================= MEASUREMENT CALENDAR HELPERS =================
+
+  List<Map<String, dynamic>> _getMeasurementsForDay(DateTime day) {
+    return _history.where((m) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(m['measured_at'] as int);
+      return isSameDay(dt, day);
+    }).toList();
+  }
+
+  Widget _buildCalendarCell(DateTime day, {required bool isSelected, bool isToday = false}) {
+    final hasMeasurement = _getMeasurementsForDay(day).isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.blue : Colors.transparent,
+        shape: BoxShape.circle,
+        border: isToday && !isSelected ? Border.all(color: Colors.blue) : null,
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${day.day}',
+            style: TextStyle(
+              color: isSelected ? Colors.white : (isToday ? Colors.blue : Colors.white),
+              fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          if (hasMeasurement) ...[
+            const SizedBox(height: 2),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.blueAccent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -704,7 +796,7 @@ class ProfilePageState extends State<ProfilePage> {
   Future<void> _addMeasurement() async {
     final result = await Navigator.push(
       context,
-      AppRoutes.slideFromRight(const AddMeasurementPage()),
+      AppRoutes.slideFromRight(AddMeasurementPage(measuredDate: _selectedDate)),
     );
     if (result == true) {
       _loadData();
