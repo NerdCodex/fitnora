@@ -24,7 +24,7 @@ class WorkoutDatabaseService {
 
     return openDatabase(
       dbPath,
-      version: 3,
+      version: 4,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -50,7 +50,6 @@ class WorkoutDatabaseService {
       CREATE TABLE routine (
         routine_id INTEGER PRIMARY KEY AUTOINCREMENT,
         routine_name TEXT NOT NULL,
-        is_deleted INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL
       );
     ''');
@@ -127,8 +126,7 @@ class WorkoutDatabaseService {
         'exercise_image': exerciseImage,
         'exercise_name': exerciseName,
         'exercise_equipment': exerciseEquipment,
-        'exercise_type': exerciseType
-
+        'exercise_type': exerciseType,
       },
       where: 'exercise_id = ?',
       whereArgs: [exerciseId],
@@ -146,7 +144,7 @@ class WorkoutDatabaseService {
       });
 
       // Insert routine exercises
-      final exercises = routineData['exercise'] as List<Map<String, dynamic>>;
+      final exercises = routineData['exercises'] as List<Map<String, dynamic>>;
 
       for (final ex in exercises) {
         await txn.insert('routine_exercise', {
@@ -161,11 +159,7 @@ class WorkoutDatabaseService {
   Future<List<Map<String, dynamic>>> getRoutinesWithExercises() async {
     final db = await database;
 
-    final routines = await db.query(
-      'routine',
-      where: 'is_deleted = 0',
-      orderBy: 'created_at DESC',
-    );
+    final routines = await db.query('routine', orderBy: 'created_at DESC');
 
     final List<Map<String, dynamic>> result = [];
 
@@ -190,5 +184,79 @@ class WorkoutDatabaseService {
     }
 
     return result;
+  }
+
+  Future<void> updateRoutine({
+    required int routineId,
+    required Map<String, dynamic> data,
+  }) async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      await txn.update(
+        'routine',
+        {'routine_name': data['routine_name']},
+        where: 'routine_id = ?',
+        whereArgs: [routineId],
+      );
+
+      await txn.delete(
+        'routine_exercise',
+        where: 'routine_id = ?',
+        whereArgs: [routineId],
+      );
+
+      for (final ex in data['exercises']) {
+        await txn.insert('routine_exercise', {
+          'routine_id': routineId,
+          'exercise_id': ex['exercise_id'],
+          'exercise_order': ex['exercise_order'],
+        });
+      }
+    });
+  }
+
+   Future<Map<String, dynamic>> getRoutineForEdit(int routineId) async {
+    final db = await database;
+
+    // 1. Get routine metadata
+    final routineResult = await db.query(
+      'routine',
+      where: 'routine_id = ?',
+      whereArgs: [routineId],
+      limit: 1,
+    );
+
+    if (routineResult.isEmpty) {
+      throw Exception('Routine not found: $routineId');
+    }
+
+    final routine = routineResult.first;
+
+    // 2. Get exercises with order + exercise details
+    final exercises = await db.rawQuery(
+      '''
+    SELECT
+      re.exercise_id,
+      re.exercise_order,
+      e.exercise_name,
+      e.exercise_equipment,
+      e.exercise_type,
+      e.exercise_image
+    FROM routine_exercise re
+    INNER JOIN exercise e
+      ON e.exercise_id = re.exercise_id
+    WHERE re.routine_id = ?
+    ORDER BY re.exercise_order ASC
+  ''',
+      [routineId],
+    );
+
+    // 3. Return editor-ready payload
+    return {
+      'routine_id': routineId,
+      'routine_name': routine['routine_name'],
+      'exercises': exercises,
+    };
   }
 }

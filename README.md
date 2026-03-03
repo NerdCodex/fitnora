@@ -18,22 +18,29 @@ samples, guidance on mobile development, and a full API reference.
 
 ## Todo
 - [x] Image Transfer
+- [x] Create/View Exercise
 - [x] Edit Exercise
-- [ ] Delete Exercise
 - [x] Create Routine
-- [ ] Edit Routine
-- [ ] Delete Routine
+
+## Todo (03/03/2026) 
+- [x] Edit Routine
+- [x] Delete Routine
 - [ ] Track Session
+- [ ] View Session
 - [ ] Edit Session
 - [ ] Create Food
 - [ ] Edit Food
 - [ ] Delete Food
+
+## Todo (04/03/2026) 
 - [ ] Track Meal
-- [ ] Exercise Reps, Sets Graph
-- [ ] Calories Taken Graph
 - [ ] Track Measurements
 - [ ] Edit Measurements
 - [ ] Delete Measurements
+- [ ] Delete Exercise
+- [ ] Exercise Reps, Sets Graph
+- [ ] Calories Taken Graph
 - [ ] Upload Backup
 - [ ] Download Backup
 - [ ] History - {Delete Session, Edit Session, Edit Meal, Delete Meal}
+- [ ] Notification
