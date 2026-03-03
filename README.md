@@ -24,7 +24,6 @@ samples, guidance on mobile development, and a full API reference.
 
 ## Todo (03/03/2026) 
 - [x] Edit Routine
-- [x] Delete Routine
 - [ ] Track Session
 - [ ] View Session
 - [ ] Edit Session
@@ -37,6 +36,7 @@ samples, guidance on mobile development, and a full API reference.
 - [ ] Track Measurements
 - [ ] Edit Measurements
 - [ ] Delete Measurements
+- [ ] Delete Routine
 - [ ] Delete Exercise
 - [ ] Exercise Reps, Sets Graph
 - [ ] Calories Taken Graph
