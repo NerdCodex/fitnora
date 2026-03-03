@@ -23,7 +23,6 @@ class _CustomImagePickerState extends State<CustomImagePicker> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     if (widget.initialImage.isNotEmpty) {
       _loadImage();

@@ -12,8 +12,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _pageIndex = 0;
+  final _profileKey = GlobalKey<ProfilePageState>();
 
-  static const List<Widget> _tabs = [WorkoutPage(), FoodPage(), ProfilePage()];
+  late final List<Widget> _tabs = [const WorkoutPage(), const FoodPage(), ProfilePage(key: _profileKey)];
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +31,10 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _pageIndex = index;
           });
+          // Reload profile data when switching to the profile tab
+          if (index == 2) {
+            _profileKey.currentState?.reload();
+          }
         },
         items: const [
           BottomNavigationBarItem(

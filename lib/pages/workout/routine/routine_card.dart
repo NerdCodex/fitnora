@@ -24,8 +24,16 @@ class RoutineCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade900,
+        color: const Color(0xFF161616),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,11 +72,25 @@ class RoutineCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             height: 48,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
               onPressed: onStart,
-              child: const Text(
+              icon: const Icon(Icons.play_arrow, size: 20, color: Colors.white),
+              label: const Text(
                 "Start Routine",
-                style: TextStyle(fontFamily: "poppins"),
+                style: TextStyle(
+                  fontFamily: "poppins",
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent.withValues(alpha: 0.2),
+                foregroundColor: Colors.blueAccent,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.blueAccent.withValues(alpha: 0.5)),
+                ),
               ),
             ),
           ),

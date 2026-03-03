@@ -25,6 +25,7 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
   String imagePath = "";
   String selectedEquipment = "";
   String selectedExerciseType = "";
+  String _originalExerciseType = ""; // Track original type for change detection
   bool imageChanged = false;
   bool isLoading = false;
 
@@ -62,6 +63,7 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
       _exerciseNameController.text = result["exercise_name"];
       selectedEquipment = result["exercise_equipment"];
       selectedExerciseType = result["exercise_type"];
+      _originalExerciseType = result["exercise_type"]; // Store original
       isLoading = false;
     });
   }
@@ -174,7 +176,34 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
         selectedExerciseType,
       );
     } else {
-      // UPDATE
+      // UPDATE — check if exercise type changed
+      final exerciseId = int.parse(widget.exerciseId);
+      final typeChanged = _originalExerciseType.isNotEmpty && 
+          selectedExerciseType != _originalExerciseType;
+
+      if (typeChanged) {
+        final hasSessions = await WorkoutDatabaseService.instance
+            .hasExerciseSessions(exerciseId);
+
+        if (hasSessions) {
+          final confirm = await showConfirmDialog(
+            context,
+            title: "Exercise Type Changed",
+            content: "Changing the exercise type from '$_originalExerciseType' to "
+                "'$selectedExerciseType' will delete all session data for this "
+                "exercise. Continue?",
+            trueText: "DELETE & SAVE",
+            falseText: "CANCEL",
+          );
+
+          if (confirm != true) return;
+
+          // Delete all session data for this exercise
+          await WorkoutDatabaseService.instance
+              .deleteSessionsByExerciseId(exerciseId);
+        }
+      }
+
       await WorkoutDatabaseService.instance.updateExercise(
         widget.exerciseId,
         savedImageFileName,
