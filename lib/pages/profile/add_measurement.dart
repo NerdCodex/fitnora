@@ -33,6 +33,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
 
   String _imagePath = "";
   bool _imageChanged = false;
+  final List<String> _unsavedImagePaths = [];
 
   @override
   void initState() {
@@ -68,6 +69,15 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
     _chestCtrl.dispose();
     _waistCtrl.dispose();
     _hipsCtrl.dispose();
+
+    // Cleanup unsaved images when leaving screen
+    for (var path in _unsavedImagePaths) {
+      final file = File(path);
+      if (file.existsSync()) {
+        try { file.deleteSync(); } catch (_) {}
+      }
+    }
+    
     super.dispose();
   }
 
@@ -107,9 +117,22 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       Center(
                         child: CustomImagePicker(
                           initialImage: _imagePath,
-                          onChange: (path) {
+                          onChange: (path) async {
+                            if (path.isEmpty) {
+                              setState(() {
+                                _imagePath = path;
+                                _imageChanged = true;
+                              });
+                              return;
+                            }
+                            // Save picked image to app document directory temporarily
+                            final savedName = await _saveImage(File(path));
+                            final appDir = await getApplicationDocumentsDirectory();
+                            final newPath = p.join(appDir.path, local_images, savedName);
+                            _unsavedImagePaths.add(newPath);
+
                             setState(() {
-                              _imagePath = path;
+                              _imagePath = newPath;
                               _imageChanged = true;
                             });
                           },
@@ -199,9 +222,12 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
       oldImageFileName = old?['progress_image']?.toString() ?? "";
     }
 
-    // If image changed → save new image
+    // New logic: _imagePath is already saved in app doc by onChange (CustomImagePicker)
+    // We just need to extract the filename relative to the local_images dir
     if (_imageChanged && _imagePath.isNotEmpty) {
-      savedImageFileName = await _saveImage(File(_imagePath));
+      savedImageFileName = p.basename(_imagePath);
+      // Remove it from unsaved paths so it doesn't get deleted on dispose
+      _unsavedImagePaths.removeWhere((path) => path == _imagePath);
     }
 
     final Map<String, dynamic> data = {

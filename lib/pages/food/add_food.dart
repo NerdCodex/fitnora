@@ -2,6 +2,7 @@ import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
+import 'package:fitnora/services/api_service.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 
@@ -95,7 +96,24 @@ class _AddFoodPageState extends State<AddFoodPage> {
                 const SizedBox(height: 20),
 
                 FormLabel(text: "Food Name *"),
-                AppTextField(hintText: "e.g. Chicken Breast", controller: _nameCtrl),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppTextField(hintText: "e.g. Chicken Breast", controller: _nameCtrl),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: _askAI,
+                      icon: const Icon(Icons.auto_awesome, color: Colors.yellow, size: 18),
+                      label: const Text("Ask AI", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent.withValues(alpha: 0.2),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
 
                 const SizedBox(height: 10),
                 FormLabel(text: "Serving Size"),
@@ -150,6 +168,59 @@ class _AddFoodPageState extends State<AddFoodPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _askAI() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      showMessageDialog(context, "Please enter a food name first to ask AI.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // 1. Check if name exists locally
+    final foods = await WorkoutDatabaseService.instance.getFoodItems();
+    final lowerName = name.toLowerCase();
+    final exists = foods.any((f) => f['food_name'].toString().toLowerCase() == lowerName);
+    
+    if (exists) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showMessageDialog(context, "This food already exists in your database!");
+      return;
+    }
+
+    // 2. Query Backend API
+    final response = await ApiService.post("/user/food/analyze", {"food_name": name}, withAuth: true);
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (response.statusCode == 0) {
+      showMessageDialog(context, "No Internet: Please check your connection.");
+      return;
+    }
+
+    if (!response.isSuccess || response.data == null) {
+      showMessageDialog(context, response.data?["message"] ?? "Failed to analyze food.");
+      return;
+    }
+
+    final data = response.data!;
+    
+    if (data["valid"] == true) {
+      setState(() {
+        _nameCtrl.text = data["food_name"]?.toString() ?? name;
+        _caloriesCtrl.text = data["calories"]?.toString() ?? "0";
+        _proteinCtrl.text = data["protein_g"]?.toString() ?? "0";
+        _carbsCtrl.text = data["carbs_g"]?.toString() ?? "0";
+        _fatCtrl.text = data["fat_g"]?.toString() ?? "0";
+        _servingCtrl.text = "100g"; // API returns based on 100g
+      });
+    } else {
+      showMessageDialog(context, "Invalid food name. Please enter a real food item.");
+    }
   }
 
   Future<void> _save() async {

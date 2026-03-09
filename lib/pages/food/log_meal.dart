@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 
 class LogMealPage extends StatefulWidget {
   final DateTime? loggedDate;
-  const LogMealPage({super.key, this.loggedDate});
+  final String? initialMealType;
+  const LogMealPage({super.key, this.loggedDate, this.initialMealType});
 
   @override
   State<LogMealPage> createState() => _LogMealPageState();
@@ -31,6 +32,9 @@ class _LogMealPageState extends State<LogMealPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialMealType != null) {
+      _selectedMealType = widget.initialMealType!;
+    }
     _loadFoods();
     _gramsCtrl.addListener(_onGramsChanged);
   }

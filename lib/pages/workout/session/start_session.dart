@@ -331,7 +331,7 @@ class _StartSessionPageState extends State<StartSessionPage> {
         'session_exercise_id': sessionExerciseId,
         'set_order': sets.length + 1,
         'weight': 0.0,
-        'reps': 0,
+        'value': 0,
         'is_completed': 0,
       });
       _markChanged();
@@ -432,7 +432,7 @@ class _StartSessionPageState extends State<StartSessionPage> {
         await WorkoutDatabaseService.instance.updateSessionSet(
           setId: s['set_id'],
           weight: (s['weight'] as num).toDouble(),
-          reps: s['reps'] as int,
+          value: s['value'] as int,
           isCompleted: (s['is_completed'] as int) == 1,
         );
       }
@@ -657,7 +657,7 @@ class _SetRow extends StatefulWidget {
 
 class _SetRowState extends State<_SetRow> {
   late TextEditingController _weightCtrl;
-  late TextEditingController _repsCtrl;
+  late TextEditingController _valueCtrl;
   late bool _completed;
 
   @override
@@ -672,34 +672,34 @@ class _SetRowState extends State<_SetRow> {
     // Only reinitialize when it's a completely different set (e.g. reorder)
     if (oldWidget.setData['set_id'] != widget.setData['set_id']) {
       _weightCtrl.dispose();
-      _repsCtrl.dispose();
+      _valueCtrl.dispose();
       _initVals();
     }
   }
 
   void _initVals() {
     final w = widget.setData['weight'] as num? ?? 0;
-    final r = widget.setData['reps'] as int? ?? 0;
+    final r = widget.setData['value'] as int? ?? 0;
     _weightCtrl = TextEditingController(text: w > 0 ? w.toString() : '');
-    _repsCtrl = TextEditingController(text: r > 0 ? r.toString() : '');
+    _valueCtrl = TextEditingController(text: r > 0 ? r.toString() : '');
     _completed = (widget.setData['is_completed'] as int? ?? 0) == 1;
   }
 
   @override
   void dispose() {
     _weightCtrl.dispose();
-    _repsCtrl.dispose();
+    _valueCtrl.dispose();
     super.dispose();
   }
 
   void _dispatchChange() {
     final weight = double.tryParse(_weightCtrl.text) ?? 0.0;
-    final reps = int.tryParse(_repsCtrl.text) ?? 0;
+    final value = int.tryParse(_valueCtrl.text) ?? 0;
 
     final newData = {
       ...widget.setData,
       'weight': weight,
-      'reps': reps,
+      'value': value,
       'is_completed': _completed ? 1 : 0,
     };
     widget.onChanged(newData);
@@ -771,7 +771,7 @@ class _SetRowState extends State<_SetRow> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: TextField(
-                  controller: _repsCtrl,
+                  controller: _valueCtrl,
                   textAlign: TextAlign.center,
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.white, fontSize: 14),

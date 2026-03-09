@@ -123,7 +123,7 @@ class _FoodPageState extends State<FoodPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
+                  
                   // ================= NUTRITION SUMMARY =================
                   _buildNutritionCard(),
                   const SizedBox(height: 24),
@@ -136,12 +136,6 @@ class _FoodPageState extends State<FoodPage> {
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'food_fab',
-        onPressed: _goLogMeal,
-        backgroundColor: Colors.blue[700],
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
   // ================= FOOD CALENDAR CELL =================
@@ -196,6 +190,41 @@ class _FoodPageState extends State<FoodPage> {
       ),
       child: Column(
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Nutrition",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _goLogMeal(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    "Log Meal",
+                    style: TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Text(
             _nutrition['calories']!.toStringAsFixed(0),
             style: const TextStyle(
@@ -250,68 +279,80 @@ class _FoodPageState extends State<FoodPage> {
         .where((m) => m['meal_type'] == mealType)
         .toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: Colors.grey, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              mealType,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (filtered.isEmpty)
+    double totalCals = 0;
+    for (var m in filtered) {
+       totalCals += (m['calories'] as num) * (m['servings'] as num);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
           Padding(
-            padding: const EdgeInsets.only(left: 28, bottom: 16),
-            child: Text(
-              "No items logged",
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.blueAccent, size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  mealType,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  "${totalCals.toStringAsFixed(0)} kcal",
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          )
-        else
-          ...filtered.map((meal) => _buildMealTile(meal)),
-        const SizedBox(height: 8),
-      ],
+          ),
+          
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Text(
+                "No items logged for $mealType",
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              ),
+            )
+          else ...[
+            const Divider(color: Colors.white12, height: 1),
+            ...filtered.map((meal) => _buildMealTile(meal)),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildMealTile(Map<String, dynamic> meal) {
     final cal = ((meal['calories'] as num) * (meal['servings'] as num))
         .toStringAsFixed(0);
+    final protein = ((meal['protein'] as num) * (meal['servings'] as num)).toStringAsFixed(1);
+    final carbs = ((meal['carbs'] as num) * (meal['servings'] as num)).toStringAsFixed(1);
+    final fat = ((meal['fat'] as num) * (meal['servings'] as num)).toStringAsFixed(1);
 
-    return Dismissible(
-      key: ValueKey(meal['meal_log_id']),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        margin: const EdgeInsets.only(bottom: 8, left: 28),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      onDismissed: (_) async {
-        await WorkoutDatabaseService.instance
-            .deleteMealLog(meal['meal_log_id'] as int);
-        _loadData();
-      },
+    return InkWell(
+      onTap: () => _showMealOptionsSheet(meal),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8, left: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF121212),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.white12, width: 0.5)),
         ),
         child: Row(
           children: [
@@ -327,22 +368,35 @@ class _FoodPageState extends State<FoodPage> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    "${((meal['servings'] as num) * 100).toStringAsFixed(0)}g",
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 12,
-                    ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        "${((meal['servings'] as num) * 100).toStringAsFixed(0)}g",
+                        style: const TextStyle(
+                          color: Colors.blueAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        "P: ${protein}g · C: ${carbs}g · F: ${fat}g",
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             Text(
-              "$cal cal",
+              cal,
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
+                color: Colors.white,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -352,12 +406,160 @@ class _FoodPageState extends State<FoodPage> {
     );
   }
 
+  void _showMealOptionsSheet(Map<String, dynamic> meal) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  meal['food_name'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.blue),
+                title: const Text("Edit Serving Size", style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editServingSize(meal);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.drive_file_move, color: Colors.orange),
+                title: const Text("Move to...", style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _moveOrCopyMeal(meal, isCopy: false);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy, color: Colors.green),
+                title: const Text("Copy to...", style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _moveOrCopyMeal(meal, isCopy: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text("Delete", style: TextStyle(color: Colors.red)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await WorkoutDatabaseService.instance.deleteMealLog(meal['meal_log_id'] as int);
+                  _loadData();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editServingSize(Map<String, dynamic> meal) async {
+    final TextEditingController ctrl = TextEditingController(
+      text: ((meal['servings'] as num) * 100).toStringAsFixed(0),
+    );
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: const Text("Edit Serving Amount", style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            suffixText: "g",
+            suffixStyle: TextStyle(color: Colors.white54),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("CANCEL", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text("SAVE", style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      final val = double.tryParse(result);
+      if (val != null && val > 0) {
+        await WorkoutDatabaseService.instance.updateMealLog(
+          meal['meal_log_id'] as int,
+          {'servings': val / 100},
+        );
+        _loadData();
+      }
+    }
+  }
+
+  Future<void> _moveOrCopyMeal(Map<String, dynamic> meal, {required bool isCopy}) async {
+    final types = ["Breakfast", "Lunch", "Dinner", "Snack"];
+    types.remove(meal['meal_type']);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: Text(isCopy ? "Copy to..." : "Move to...", style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: types.map((t) {
+            return ListTile(
+              title: Text(t, style: const TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, t),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+
+    if (result != null) {
+      if (isCopy) {
+        await WorkoutDatabaseService.instance.logMeal({
+          'food_id': meal['food_id'],
+          'meal_type': result,
+          'servings': meal['servings'],
+          'logged_at': meal['logged_at'], 
+        });
+      } else {
+        await WorkoutDatabaseService.instance.updateMealLog(
+          meal['meal_log_id'] as int,
+          {'meal_type': result},
+        );
+      }
+      _loadData();
+    }
+  }
+
   // ================= NAVIGATION =================
 
-  Future<void> _goLogMeal() async {
+  Future<void> _goLogMeal({String? prefillType}) async {
     final result = await Navigator.push(
       context,
-      AppRoutes.slideFromRight(LogMealPage(loggedDate: _selectedDate)),
+      AppRoutes.slideFromRight(LogMealPage(loggedDate: _selectedDate, initialMealType: prefillType)),
     );
     if (result == true) _loadData();
   }

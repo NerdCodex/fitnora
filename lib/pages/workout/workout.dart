@@ -68,67 +68,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
                 const SizedBox(height: 28),
 
-                // ================= ROUTINE SECTION =================
-                _buildCollapsibleHeader(
-                  "My Routines",
-                  routinesExpanded,
-                  () => setState(() => routinesExpanded = !routinesExpanded),
-                ),
-
-                if (routinesExpanded) ...[
-                  const SizedBox(height: 16),
-
-                  if (_loadingRoutines)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (_routines.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Text(
-                          "No routines yet",
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    )
-                  else
-                    Column(
-                      children: _routines.map((routine) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: RoutineCard(
-                            routine: routine,
-                            onStart: () => _startSession(routine),
-                            onEdit: () async {
-                              Navigator.pop(context);
-                              await Navigator.push(
-                                context,
-                                AppRoutes.slideFromRight(
-                                  CreateRoutinePage(
-                                    routineId: routine["routine_id"],
-                                  ),
-                                ),
-                              );
-                              await _loadRoutines();
-                            },
-                            onDelete: () async {
-                              Navigator.pop(context);
-                              await WorkoutDatabaseService.instance
-                                  .deleteRoutine(routine["routine_id"]);
-                              await _loadRoutines();
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                ],
-
-                const SizedBox(height: 28),
-
                 // ================= SESSIONS SECTION =================
                 _buildCollapsibleHeader(
                   "Workout Sessions",
@@ -218,6 +157,67 @@ class _WorkoutPageState extends State<WorkoutPage> {
                           style: TextStyle(color: Colors.grey),
                         ),
                       ),
+                    ),
+                ],
+
+                const SizedBox(height: 28),
+
+                // ================= ROUTINE SECTION =================
+                _buildCollapsibleHeader(
+                  "My Routines",
+                  routinesExpanded,
+                  () => setState(() => routinesExpanded = !routinesExpanded),
+                ),
+
+                if (routinesExpanded) ...[
+                  const SizedBox(height: 16),
+
+                  if (_loadingRoutines)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_routines.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Text(
+                          "No routines yet",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    Column(
+                      children: _routines.map((routine) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: RoutineCard(
+                            routine: routine,
+                            onStart: () => _startSession(routine),
+                            onEdit: () async {
+                              Navigator.pop(context);
+                              await Navigator.push(
+                                context,
+                                AppRoutes.slideFromRight(
+                                  CreateRoutinePage(
+                                    routineId: routine["routine_id"],
+                                  ),
+                                ),
+                              );
+                              await _loadRoutines();
+                            },
+                            onDelete: () async {
+                              Navigator.pop(context);
+                              await WorkoutDatabaseService.instance
+                                  .deleteRoutine(routine["routine_id"]);
+                              await _loadRoutines();
+                            },
+                          ),
+                        );
+                      }).toList(),
                     ),
                 ],
               ],

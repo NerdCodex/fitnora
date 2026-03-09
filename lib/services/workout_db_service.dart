@@ -15,6 +15,13 @@ class WorkoutDatabaseService {
     return _db!;
   }
 
+  Future<void> closeDb() async {
+    if (_db != null) {
+      await _db!.close();
+      _db = null;
+    }
+  }
+
   Future<Database> _initDb() async {
     final dbPath = join(
       await getDatabasesPath(),
@@ -77,7 +84,6 @@ class WorkoutDatabaseService {
         routine_id INTEGER,
         started_at INTEGER NOT NULL,
         completed_at INTEGER,
-        status TEXT NOT NULL DEFAULT 'in_progress',
 
         FOREIGN KEY (routine_id) REFERENCES routine(routine_id) ON DELETE SET NULL
       );
@@ -101,7 +107,7 @@ class WorkoutDatabaseService {
         session_exercise_id INTEGER NOT NULL,
         set_order INTEGER NOT NULL,
         weight REAL NOT NULL DEFAULT 0,
-        reps INTEGER NOT NULL DEFAULT 0,
+        value INTEGER NOT NULL DEFAULT 0,
         is_completed INTEGER NOT NULL DEFAULT 0,
 
         FOREIGN KEY (session_exercise_id) REFERENCES session_exercise(session_exercise_id) ON DELETE CASCADE
@@ -415,7 +421,6 @@ class WorkoutDatabaseService {
       final sessionId = await txn.insert('workout_session', {
         'routine_id': routineId,
         'started_at': (startedAt ?? DateTime.now()).millisecondsSinceEpoch,
-        'status': 'in_progress',
       });
 
       // 2. Copy exercises from the routine
@@ -441,7 +446,7 @@ class WorkoutDatabaseService {
           'session_exercise_id': seId,
           'set_order': 1,
           'weight': 0,
-          'reps': 0,
+          'value': 0,
           'is_completed': 0,
         });
       }
@@ -514,7 +519,7 @@ class WorkoutDatabaseService {
       'session_exercise_id': seId,
       'set_order': 1,
       'weight': 0,
-      'reps': 0,
+      'value': 0,
       'is_completed': 0,
     });
 
@@ -536,7 +541,7 @@ class WorkoutDatabaseService {
       'session_exercise_id': sessionExerciseId,
       'set_order': nextOrder,
       'weight': 0,
-      'reps': 0,
+      'value': 0,
       'is_completed': 0,
     });
   }
@@ -551,11 +556,11 @@ class WorkoutDatabaseService {
     );
   }
 
-  /// Update a specific set (weight, reps, completion).
+  /// Update a specific set (weight, value, completion).
   Future<void> updateSessionSet({
     required int setId,
     required double weight,
-    required int reps,
+    required int value,
     required bool isCompleted,
   }) async {
     final db = await database;
@@ -563,7 +568,7 @@ class WorkoutDatabaseService {
       'session_set',
       {
         'weight': weight,
-        'reps': reps,
+        'value': value,
         'is_completed': isCompleted ? 1 : 0,
       },
       where: 'set_id = ?',
@@ -584,9 +589,7 @@ class WorkoutDatabaseService {
   /// Complete a workout session.
   Future<void> completeSession(int sessionId, {int? startedAt, int? completedAt}) async {
     final db = await database;
-    final updates = <String, dynamic>{
-      'status': 'completed',
-    };
+    final updates = <String, dynamic>{};
     if (startedAt != null) updates['started_at'] = startedAt;
     updates['completed_at'] = completedAt ?? DateTime.now().millisecondsSinceEpoch;
     await db.update(
@@ -604,27 +607,26 @@ class WorkoutDatabaseService {
       'workout_session',
       {
         'completed_at': DateTime.now().millisecondsSinceEpoch,
-        'status': 'abandoned',
       },
       where: 'session_id = ?',
       whereArgs: [sessionId],
     );
   }
 
-  /// Get session history (completed + abandoned).
+  /// Get session history (completed).
   Future<List<Map<String, dynamic>>> getSessionHistory() async {
     final db = await database;
     return await db.rawQuery('''
       SELECT 
         ws.*, 
         r.routine_name,
-        COALESCE(SUM(ss.weight * ss.reps), 0) AS total_volume,
+        COALESCE(SUM(ss.weight * ss.value), 0) AS total_volume,
         SUM(CASE WHEN ss.is_completed = 1 THEN 1 ELSE 0 END) AS total_sets
       FROM workout_session ws
       LEFT JOIN routine r ON r.routine_id = ws.routine_id
       LEFT JOIN session_exercise se ON se.session_id = ws.session_id
       LEFT JOIN session_set ss ON ss.session_exercise_id = se.session_exercise_id
-      WHERE ws.status != 'in_progress'
+      WHERE ws.completed_at IS NOT NULL
       GROUP BY ws.session_id
       ORDER BY ws.started_at DESC
     ''');
@@ -807,6 +809,23 @@ class WorkoutDatabaseService {
     final db = await database;
     await db.delete(
       'meal_log',
+      where: 'meal_log_id = ?',
+      whereArgs: [mealLogId],
+    );
+  }
+
+  Future<void> updateMealLog(int mealLogId, Map<String, dynamic> data) async {
+    final db = await database;
+    final updates = <String, dynamic>{};
+    if (data.containsKey('servings')) updates['servings'] = data['servings'];
+    if (data.containsKey('meal_type')) updates['meal_type'] = data['meal_type'];
+    if (data.containsKey('logged_at')) updates['logged_at'] = data['logged_at'];
+    
+    if (updates.isEmpty) return;
+
+    await db.update(
+      'meal_log',
+      updates,
       where: 'meal_log_id = ?',
       whereArgs: [mealLogId],
     );
