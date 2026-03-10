@@ -31,7 +31,7 @@ class WorkoutDatabaseService {
 
     return openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -226,14 +226,23 @@ class WorkoutDatabaseService {
   }
 
   /// Soft-delete an exercise (hide from lists but preserve session history).
+  /// Also removes from routine_exercise so it won't appear in future sessions.
   Future<void> softDeleteExercise(int exerciseId) async {
     final db = await database;
-    await db.update(
-      'exercise',
-      {'is_deleted': 1},
-      where: 'exercise_id = ?',
-      whereArgs: [exerciseId],
-    );
+    await db.transaction((txn) async {
+      await txn.update(
+        'exercise',
+        {'is_deleted': 1},
+        where: 'exercise_id = ?',
+        whereArgs: [exerciseId],
+      );
+      // Remove from all routines so it doesn't sneak into new sessions
+      await txn.delete(
+        'routine_exercise',
+        where: 'exercise_id = ?',
+        whereArgs: [exerciseId],
+      );
+    });
   }
 
   /// Hard-delete an exercise permanently.
@@ -306,7 +315,7 @@ class WorkoutDatabaseService {
       SELECT e.exercise_name
       FROM routine_exercise re
       JOIN exercise e ON e.exercise_id = re.exercise_id
-      WHERE re.routine_id = ?
+      WHERE re.routine_id = ? AND e.is_deleted = 0
       ORDER BY re.exercise_order ASC
       LIMIT 4
     ''',
@@ -383,7 +392,7 @@ class WorkoutDatabaseService {
     FROM routine_exercise re
     INNER JOIN exercise e
       ON e.exercise_id = re.exercise_id
-    WHERE re.routine_id = ?
+    WHERE re.routine_id = ? AND e.is_deleted = 0
     ORDER BY re.exercise_order ASC
   ''',
       [routineId],
