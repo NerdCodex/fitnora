@@ -620,12 +620,15 @@ class WorkoutDatabaseService {
       SELECT 
         ws.*, 
         r.routine_name,
-        COALESCE(SUM(ss.weight * ss.value), 0) AS total_volume,
-        SUM(CASE WHEN ss.is_completed = 1 THEN 1 ELSE 0 END) AS total_sets
+        COALESCE(SUM(CASE WHEN ss.is_completed = 1 THEN ss.weight ELSE 0 END), 0) AS total_volume,
+        SUM(CASE WHEN ss.is_completed = 1 THEN 1 ELSE 0 END) AS total_sets,
+        COALESCE(SUM(CASE WHEN ss.is_completed = 1 AND e.exercise_type = 'reps' THEN ss.value ELSE 0 END), 0) AS total_reps,
+        COALESCE(SUM(CASE WHEN ss.is_completed = 1 AND e.exercise_type = 'seconds' THEN ss.value ELSE 0 END), 0) AS total_seconds
       FROM workout_session ws
       LEFT JOIN routine r ON r.routine_id = ws.routine_id
       LEFT JOIN session_exercise se ON se.session_id = ws.session_id
       LEFT JOIN session_set ss ON ss.session_exercise_id = se.session_exercise_id
+      LEFT JOIN exercise e ON e.exercise_id = se.exercise_id
       WHERE ws.completed_at IS NOT NULL
       GROUP BY ws.session_id
       ORDER BY ws.started_at DESC

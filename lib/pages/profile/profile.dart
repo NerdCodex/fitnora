@@ -24,6 +24,8 @@ class ProfilePageState extends State<ProfilePage> {
   List<Map<String, dynamic>> _sessions = [];
   List<Map<String, dynamic>> _nutritionHistory = [];
   String _selectedNutritionMetric = 'Calories'; // Calories | Protein | Carbs
+  String _selectedWorkoutMetric = 'Volume'; // Volume | Reps | Seconds
+  String _selectedWorkoutRange = 'Last 3 months';
 
   DateTime _focusedDate = DateTime.now();
   DateTime _selectedDate = DateTime.now();
@@ -150,21 +152,21 @@ class ProfilePageState extends State<ProfilePage> {
                   _buildSectionHeader("Progress"),
                   const SizedBox(height: 12),
 
-                  // Graph 1: Body Weight + Body Fat
-                  if (_history.isNotEmpty) ...[
-                    _buildBodyGraph(),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Graph 2: Volume / Sets
+                  // Graph 1: Workout Session (bar chart)
                   if (_sessions.isNotEmpty) ...[
-                    _buildVolumeGraph(),
+                    _buildWorkoutSessionGraph(),
                     const SizedBox(height: 16),
                   ],
 
-                  // Graph 3: Nutrition (Calories, Protein, Carbs)
+                  // Graph 2: Nutrition (Calories, Protein, Carbs)
                   if (_nutritionHistory.isNotEmpty) ...[
                     _buildNutritionGraph(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Graph 3: Body Weight + Body Fat
+                  if (_history.isNotEmpty) ...[
+                    _buildBodyGraph(),
                     const SizedBox(height: 16),
                   ],
 
@@ -509,77 +511,322 @@ class ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ================= GRAPH 2: Volume / Sets =================
+  // ================= GRAPH: Workout Session (Bar Chart) =================
 
-  Widget _buildVolumeGraph() {
+  /// Filter sessions by the selected time range.
+  List<Map<String, dynamic>> _filterSessionsByRange(
+      List<Map<String, dynamic>> sessions) {
+    final now = DateTime.now();
+    DateTime cutoff;
+    switch (_selectedWorkoutRange) {
+      case 'Last month':
+        cutoff = DateTime(now.year, now.month - 1, now.day);
+        break;
+      case 'Last 6 months':
+        cutoff = DateTime(now.year, now.month - 6, now.day);
+        break;
+      case 'All time':
+        return sessions;
+      default: // Last 3 months
+        cutoff = DateTime(now.year, now.month - 3, now.day);
+    }
+    final cutoffMs = cutoff.millisecondsSinceEpoch;
+    return sessions
+        .where((s) => (s['started_at'] as int) >= cutoffMs)
+        .toList();
+  }
+
+  Widget _buildWorkoutSessionGraph() {
     final sortedSessions = List<Map<String, dynamic>>.from(_sessions)
       ..sort(
         (a, b) => (a['started_at'] as int).compareTo(b['started_at'] as int),
       );
 
-    if (sortedSessions.isEmpty) return const SizedBox();
+    final filtered = _filterSessionsByRange(sortedSessions);
+    if (filtered.isEmpty) return const SizedBox();
 
-    final earliest = sortedSessions.first['started_at'] as int;
-    final volumeSpots = <FlSpot>[];
-    final setsSpots = <FlSpot>[];
-    final dateLabels = <double, String>{};
-    double maxVol = 0;
-    double maxSets = 0;
+    // ── Compute this-week summary for the header ──
+    final now = DateTime.now();
+    final weekStart =
+        DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final weekStartMs = weekStart.millisecondsSinceEpoch;
 
-    for (var s in sortedSessions) {
-      final days =
-          ((s['started_at'] as int) - earliest) / (1000 * 60 * 60 * 24);
+    double weekTotal = 0;
+    for (var s in _sessions) {
+      if ((s['started_at'] as int) >= weekStartMs) {
+        switch (_selectedWorkoutMetric) {
+          case 'Reps':
+            weekTotal += (s['total_reps'] as num?)?.toDouble() ?? 0;
+            break;
+          case 'Seconds':
+            weekTotal += (s['total_seconds'] as num?)?.toDouble() ?? 0;
+            break;
+          default: // Volume
+            weekTotal += (s['total_volume'] as num?)?.toDouble() ?? 0;
+        }
+      }
+    }
+
+    String headerValue = weekTotal.toStringAsFixed(0);
+    String headerUnit;
+    switch (_selectedWorkoutMetric) {
+      case 'Reps':
+        headerUnit = 'reps';
+        break;
+      case 'Seconds':
+        headerUnit = 'secs';
+        break;
+      default: // Volume
+        headerUnit = 'kg';
+    }
+
+    // ── Build bar data ──
+    final List<_BarEntry> entries = [];
+    double maxY = 0;
+
+    for (var s in filtered) {
       final dt = DateTime.fromMillisecondsSinceEpoch(s['started_at'] as int);
-      dateLabels[days] = '${dt.day}/${dt.month}';
-
-      final vol = (s['total_volume'] as num?)?.toDouble() ?? 0;
-      final sets = (s['total_sets'] as num?)?.toDouble() ?? 0;
-      if (vol > 0) {
-        volumeSpots.add(FlSpot(days, vol));
-        if (vol > maxVol) maxVol = vol;
+      double value;
+      switch (_selectedWorkoutMetric) {
+        case 'Reps':
+          value = (s['total_reps'] as num?)?.toDouble() ?? 0;
+          break;
+        case 'Seconds':
+          value = (s['total_seconds'] as num?)?.toDouble() ?? 0;
+          break;
+        default: // Volume
+          value = (s['total_volume'] as num?)?.toDouble() ?? 0;
       }
-      if (sets > 0) {
-        setsSpots.add(FlSpot(days, sets));
-        if (sets > maxSets) maxSets = sets;
-      }
+      entries.add(_BarEntry(dt: dt, value: value));
+      if (value > maxY) maxY = value;
     }
 
-    // Normalize sets to volume scale
-    final normalizedSets = <FlSpot>[];
-    if (setsSpots.isNotEmpty && maxVol > 0 && maxSets > 0) {
-      final scale = maxVol / maxSets;
-      for (var s in setsSpots) {
-        normalizedSets.add(FlSpot(s.x, s.y * scale));
-      }
-    } else {
-      normalizedSets.addAll(setsSpots);
+    if (maxY == 0) maxY = 1;
+    final chartMaxY = maxY * 1.2;
+
+    String yUnit;
+    switch (_selectedWorkoutMetric) {
+      case 'Reps':
+        yUnit = '';
+        break;
+      case 'Seconds':
+        yUnit = 's';
+        break;
+      default: // Volume
+        yUnit = 'kg';
     }
 
-    final maxY = maxVol > 0
-        ? maxVol * 1.2
-        : (maxSets > 0 ? maxSets * 1.2 : 100.0);
+    // Build date label map
+    final dateLabels = <int, String>{};
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (int i = 0; i < entries.length; i++) {
+      dateLabels[i] = '${months[entries[i].dt.month - 1]} ${entries[i].dt.day}';
+    }
 
-    return _buildChartContainer(
-      title: "Workout Volume & Sets",
-      legends: [
-        if (volumeSpots.isNotEmpty) _buildLegend(Colors.purpleAccent, "Volume"),
-        if (normalizedSets.isNotEmpty) _buildLegend(Colors.tealAccent, "Sets"),
-      ],
-      chart: LineChart(
-        LineChartData(
-          minY: 0,
-          maxY: maxY,
-          gridData: const FlGridData(show: false),
-          titlesData: _chartTitles(maxY, dateLabels),
-          borderData: FlBorderData(show: false),
-          lineTouchData: _tooltipData(dateLabels, ""),
-          lineBarsData: [
-            if (volumeSpots.isNotEmpty)
-              _lineBar(volumeSpots, Colors.purpleAccent),
-            if (normalizedSets.isNotEmpty)
-              _lineBar(normalizedSets, Colors.tealAccent),
-          ],
-        ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header row: summary + dropdown ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$headerValue $headerUnit',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const TextSpan(
+                      text: ' this week',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 16,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              DropdownButton<String>(
+                value: _selectedWorkoutRange,
+                dropdownColor: Colors.grey.shade800,
+                style: const TextStyle(color: Colors.blueAccent, fontSize: 14),
+                underline: const SizedBox(),
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
+                items: ['Last month', 'Last 3 months', 'Last 6 months', 'All time']
+                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedWorkoutRange = v);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Bar chart ──
+          SizedBox(
+            height: 180,
+            child: BarChart(
+              BarChartData(
+                maxY: chartMaxY,
+                minY: 0,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: chartMaxY / 4,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.white10,
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 45,
+                      interval: chartMaxY / 4,
+                      getTitlesWidget: (value, meta) {
+                        if (value <= 0 || value >= chartMaxY) {
+                          return const SizedBox();
+                        }
+                        return Text(
+                          '${value.toStringAsFixed(value < 10 ? 1 : 0)} $yUnit',
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 9,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      interval: entries.length > 7
+                          ? (entries.length / 6).ceilToDouble()
+                          : 1,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        final label = dateLabels[idx];
+                        if (label == null) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 9,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => Colors.white,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final label = dateLabels[group.x] ?? '';
+                      final val = rod.toY.toStringAsFixed(
+                          rod.toY < 10 ? 1 : 0);
+                      return BarTooltipItem(
+                        '$val $yUnit\n',
+                        const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: label,
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                barGroups: List.generate(entries.length, (i) {
+                  return BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: entries[i].value,
+                        color: Colors.blueAccent,
+                        width: entries.length > 20
+                            ? 4
+                            : (entries.length > 10 ? 8 : 14),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(4),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Metric toggle chips ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: ['Volume', 'Reps', 'Seconds'].map((metric) {
+              final isActive = _selectedWorkoutMetric == metric;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  label: Text(
+                    metric,
+                    style: TextStyle(
+                      color: isActive ? Colors.white : Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  selected: isActive,
+                  selectedColor: Colors.blueAccent,
+                  backgroundColor: Colors.grey.shade800,
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  onSelected: (_) {
+                    setState(() => _selectedWorkoutMetric = metric);
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -962,4 +1209,11 @@ class ProfilePageState extends State<ProfilePage> {
     await WorkoutDatabaseService.instance.deleteMeasurement(id);
     _loadData();
   }
+}
+
+/// Simple data holder for workout session bar chart entries.
+class _BarEntry {
+  final DateTime dt;
+  final double value;
+  const _BarEntry({required this.dt, required this.value});
 }
