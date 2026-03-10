@@ -2,6 +2,8 @@ import 'package:fitnora/pages/home.dart';
 import 'package:fitnora/pages/loading.dart';
 import 'package:fitnora/pages/login.dart';
 import 'package:fitnora/theme.dart';
+import 'package:fitnora/services/notification_service.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -10,6 +12,9 @@ void main() async {
 
   await Hive.initFlutter();
   await Hive.openBox('auth');
+
+  await NotificationService().init();
+
   runApp(const MyApp());
 }
 
@@ -33,18 +38,28 @@ class Fitnora extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: Hive.openBox('auth'),
+      future: _initApp(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const LoadingScreen();
         }
-
-        final box = Hive.box('auth');
-        final token = box.get('access_token');
-
-        return token != null ? const HomePage() : const LoginPage();
+        return snapshot.data! ? const HomePage() : const LoginPage();
       },
     );
+  }
+
+  Future<bool> _initApp() async {
+    final box = Hive.box('auth');
+    final token = box.get('access_token');
+    final email = box.get('user_email');
+
+    if (token != null && email != null) {
+      // User is logged in — init per-user session and settings
+      await UserSession().init(email);
+      await UserSession().openSettingsBox();
+      return true;
+    }
+    return false;
   }
 }
 

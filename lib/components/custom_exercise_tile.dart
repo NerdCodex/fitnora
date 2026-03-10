@@ -4,6 +4,7 @@ import 'package:fitnora/components/custom_bottom_sheet.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/workout/exercises/create_exercise.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -81,7 +82,7 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
 
   Future<File> _loadExerciseImage(String fileName) async {
     final dir = await getApplicationDocumentsDirectory();
-    final imagePath = '${dir.path}/$local_images/$fileName';
+    final imagePath = '${dir.path}/${UserSession().imagesPath}/$fileName';
     return File(imagePath);
   }
 

@@ -7,6 +7,7 @@ import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/workout/routine/select_exercise.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -297,7 +298,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
     final dir =
         await getApplicationDocumentsDirectory();
     final file =
-        File('${dir.path}/$local_images/$imageName');
+        File('${dir.path}/${UserSession().imagesPath}/$imageName');
 
     return file.existsSync() ? file : null;
   }

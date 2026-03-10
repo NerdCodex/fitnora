@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -31,7 +32,7 @@ class _CustomImagePickerState extends State<CustomImagePicker> {
 
   Future<void> _loadImage() async {
     final dir = await getApplicationDocumentsDirectory();
-    final imagePath = '${dir.path}/$local_images/${widget.initialImage}';
+    final imagePath = '${dir.path}/${UserSession().imagesPath}/${widget.initialImage}';
     final file = File(imagePath);
     if (await file.exists()) {
     setState(() {

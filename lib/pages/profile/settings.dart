@@ -4,9 +4,13 @@ import 'package:fitnora/main.dart';
 import 'package:fitnora/pages/loading.dart';
 import 'package:fitnora/pages/login.dart';
 import 'package:fitnora/pages/profile/update_profile.dart';
+import 'package:fitnora/pages/profile/notification_settings.dart';
 import 'package:fitnora/pages/reset_password.dart';
 import 'package:fitnora/services/api_service.dart';
 import 'package:fitnora/services/backup_service.dart';
+import 'package:fitnora/services/notification_service.dart';
+import 'package:fitnora/services/user_session.dart';
+import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
@@ -120,7 +124,12 @@ class _SettingsPageState extends State<SettingsPage> {
           SettingsTile(
             icon: Icons.notifications_active_outlined,
             title: "Notifications",
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                AppRoutes.slideFromRight(const NotificationSettingsPage()),
+              );
+            },
           ),
 
           const SizedBox(height: 40),
@@ -207,8 +216,25 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> logout() async {
+    // Cancel all notifications
+    await NotificationService().cancelAllNotifications();
+
+    // Close per-user settings box
+    final settingsBoxName = UserSession().settingsBoxName;
+    if (Hive.isBoxOpen(settingsBoxName)) {
+      await Hive.box(settingsBoxName).close();
+    }
+
+    // Close the database
+    await WorkoutDatabaseService.instance.closeDb();
+
+    // Clear user session
+    UserSession().clear();
+
+    // Remove auth data
     final box = Hive.box("auth");
     await box.delete("access_token");
+    await box.delete("user_email");
 
     if (!mounted) return;
 

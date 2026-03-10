@@ -6,6 +6,7 @@ import 'package:fitnora/pages/forgot_password.dart';
 import 'package:fitnora/pages/home.dart';
 import 'package:fitnora/pages/signup/email_verification.dart';
 import 'package:fitnora/services/api_service.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
@@ -186,6 +187,12 @@ class _LoginPageState extends State<LoginPage> {
 
     final box = Hive.box('auth');
     await box.put("access_token", accessToken);
+    await box.put("user_email", email);
+
+    // Init per-user session and settings
+    await UserSession().init(email);
+    await UserSession().openSettingsBox();
+
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(context, AppRoutes.slideFromRight(HomePage()), (route) => false);
   }

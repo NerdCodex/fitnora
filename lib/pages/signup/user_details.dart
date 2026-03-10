@@ -6,6 +6,7 @@ import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/home.dart';
 import 'package:fitnora/services/api_service.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:flutter/material.dart';
 import 'package:date_field/date_field.dart';
 import 'package:hive/hive.dart';
@@ -339,7 +340,14 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
     }
 
     final box = Hive.box('auth');
-    box.put("access_token", accessToken);
+    await box.put("access_token", accessToken);
+    await box.put("user_email", widget.email);
+
+    // Init per-user session and settings
+    await UserSession().init(widget.email);
+    await UserSession().openSettingsBox();
+
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(context, AppRoutes.slideFromRight(HomePage()), (route) => false);
   }
 

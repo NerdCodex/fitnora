@@ -6,6 +6,7 @@ import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/profile/add_measurement.dart';
 import 'package:fitnora/pages/profile/settings.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -361,7 +362,7 @@ class ProfilePageState extends State<ProfilePage> {
   Future<File?> resolveProgressImage(String? fileName) async {
     if (fileName == null || fileName.isEmpty) return null;
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/$local_images/$fileName');
+    final file = File('${dir.path}/${UserSession().imagesPath}/$fileName');
     return await file.exists() ? file : null;
   }
 

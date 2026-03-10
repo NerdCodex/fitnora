@@ -7,6 +7,7 @@ import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -128,7 +129,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                             // Save picked image to app document directory temporarily
                             final savedName = await _saveImage(File(path));
                             final appDir = await getApplicationDocumentsDirectory();
-                            final newPath = p.join(appDir.path, local_images, savedName);
+                            final newPath = p.join(appDir.path, UserSession().imagesPath, savedName);
                             _unsavedImagePaths.add(newPath);
 
                             setState(() {
@@ -263,7 +264,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
 
   Future<String> _saveImage(File imageFile) async {
     final appDir = await getApplicationDocumentsDirectory();
-    final imagesDir = Directory(p.join(appDir.path, local_images));
+    final imagesDir = Directory(p.join(appDir.path, UserSession().imagesPath));
 
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);
@@ -281,7 +282,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
   Future<void> _deleteImage(String fileName) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final filePath = p.join(dir.path, local_images, fileName);
+      final filePath = p.join(dir.path, UserSession().imagesPath, fileName);
       final file = File(filePath);
 
       if (await file.exists()) {

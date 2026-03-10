@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
@@ -20,15 +21,16 @@ class BackupService {
       if (token == null) return false;
 
       // 1. Get Database Path
+      final userScope = UserSession().userScope;
       final dbFolder = await getDatabasesPath();
-      final dbPath = join(dbFolder, local_db_folder, 'workout.db');
+      final dbPath = join(dbFolder, local_db_folder, userScope, 'workout.db');
       final dbFile = File(dbPath);
 
       if (!await dbFile.exists()) return false;
 
       // 2. Get Images Path and Zip it
       final appDir = await getApplicationDocumentsDirectory();
-      final imagesDir = Directory(join(appDir.path, local_images));
+      final imagesDir = Directory(join(appDir.path, local_images, userScope));
       
       final tempDir = await getTemporaryDirectory();
       final zipPath = join(tempDir.path, 'images.zip');
@@ -81,15 +83,16 @@ class BackupService {
       final token = _getToken();
       if (token == null) return false;
 
+      final userScope = UserSession().userScope;
       final dbFolder = await getDatabasesPath();
-      final dbDir = Directory(join(dbFolder, local_db_folder));
+      final dbDir = Directory(join(dbFolder, local_db_folder, userScope));
       if (!await dbDir.exists()) {
         await dbDir.create(recursive: true);
       }
       final dbPath = join(dbDir.path, 'workout.db');
 
       final appDir = await getApplicationDocumentsDirectory();
-      final imagesDir = Directory(join(appDir.path, local_images));
+      final imagesDir = Directory(join(appDir.path, local_images, userScope));
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
       }

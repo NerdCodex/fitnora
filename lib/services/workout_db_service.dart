@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/notification_service.dart';
+import 'package:fitnora/services/user_session.dart';
 
 class WorkoutDatabaseService {
   static Database? _db;
@@ -22,10 +24,18 @@ class WorkoutDatabaseService {
     }
   }
 
+  /// Close and reopen DB for a different user.
+  Future<void> reinitialize() async {
+    await closeDb();
+    _db = await _initDb();
+  }
+
   Future<Database> _initDb() async {
+    final userScope = UserSession().userScope;
     final dbPath = join(
       await getDatabasesPath(),
       local_db_folder,
+      userScope,
       'workout.db',
     );
 
@@ -607,6 +617,7 @@ class WorkoutDatabaseService {
       where: 'session_id = ?',
       whereArgs: [sessionId],
     );
+    await NotificationService().markWorkoutDoneToday();
   }
 
   /// Abandon a workout session.
@@ -797,6 +808,7 @@ class WorkoutDatabaseService {
       'servings': data['servings'],
       'logged_at': data['logged_at'] ?? DateTime.now().millisecondsSinceEpoch,
     });
+    await NotificationService().markMealLoggedToday(data['meal_type']);
   }
 
   /// Get all meal logs for a specific day (by date string YYYY-MM-DD).

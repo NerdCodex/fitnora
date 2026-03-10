@@ -5,6 +5,7 @@ import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/workout/routine/select_exercise.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -842,7 +843,7 @@ class _ExerciseAvatar extends StatelessWidget {
   Future<File?> _resolve() async {
     if (imageName == null || imageName!.isEmpty) return null;
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/$local_images/$imageName');
+    final file = File('${dir.path}/${UserSession().imagesPath}/$imageName');
     return file.existsSync() ? file : null;
   }
 }

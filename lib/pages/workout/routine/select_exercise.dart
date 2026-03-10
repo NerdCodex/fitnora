@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fitnora/components/search_field.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -63,7 +64,7 @@ class _SelectExercisePageState extends State<SelectExercisePage> {
     if (fileName == null || fileName.isEmpty) return null;
 
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/$local_images/$fileName');
+    final file = File('${dir.path}/${UserSession().imagesPath}/$fileName');
 
     return await file.exists() ? file : null;
   }

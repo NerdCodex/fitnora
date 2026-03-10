@@ -7,6 +7,7 @@ import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/services/constants.dart';
+import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -229,7 +230,7 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
     final appDir = await getApplicationDocumentsDirectory();
 
     // Create images folder path
-    final imagesDir = Directory(p.join(appDir.path, local_images));
+    final imagesDir = Directory(p.join(appDir.path, UserSession().imagesPath));
 
     // Create folder if it doesn't exist
     if (!await imagesDir.exists()) {
@@ -251,7 +252,7 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
   Future<void> deleteImage(String fileName) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final filePath = p.join(dir.path, local_images, fileName);
+      final filePath = p.join(dir.path, UserSession().imagesPath, fileName);
       final file = File(filePath);
 
       if (await file.exists()) {
