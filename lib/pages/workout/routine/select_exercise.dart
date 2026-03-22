@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:fitnora/components/search_field.dart';
-import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';

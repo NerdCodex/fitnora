@@ -57,6 +57,10 @@ class Fitnora extends StatelessWidget {
       // User is logged in — init per-user session and settings
       await UserSession().init(email);
       await UserSession().openSettingsBox();
+
+      // Skip today's notifications for activities already logged
+      await NotificationService().syncNotificationsWithToday();
+
       return true;
     }
     return false;

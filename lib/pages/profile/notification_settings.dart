@@ -133,6 +133,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         time: _snackTime,
       );
     }
+
+    // Re-apply the daily "skip" logic for already-logged activities
+    // because scheduling new notifications overrides the previous skips.
+    await _notificationService.syncNotificationsWithToday();
   }
 
   Future<void> _selectTime(BuildContext context, TimeOfDay initialTime, Function(TimeOfDay) onSelected) async {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/alert.dart';
+import 'package:fitnora/components/custom_image_picker.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/profile/add_measurement.dart';
 import 'package:fitnora/pages/profile/settings.dart';
@@ -12,6 +13,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:video_player/video_player.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -315,18 +317,22 @@ class ProfilePageState extends State<ProfilePage> {
                       );
                     }
                     final file = snapshot.data;
-                    if (file != null) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          file,
-                          width: double.infinity,
-                          height: 200,
-                          fit: BoxFit.cover,
-                        ),
-                      );
+                    if (file == null) return const SizedBox.shrink();
+
+                    final fileName = m['progress_image'].toString();
+                    if (isVideoFile(fileName)) {
+                      return _ProgressVideoPlayer(file: file);
                     }
-                    return const SizedBox.shrink();
+
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        file,
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      ),
+                    );
                   },
                 ),
               ),
@@ -1217,4 +1223,120 @@ class _BarEntry {
   final DateTime dt;
   final double value;
   const _BarEntry({required this.dt, required this.value});
+}
+
+/// Inline video player for progress videos in the daily measurement card.
+class _ProgressVideoPlayer extends StatefulWidget {
+  final File file;
+  const _ProgressVideoPlayer({required this.file});
+
+  @override
+  State<_ProgressVideoPlayer> createState() => _ProgressVideoPlayerState();
+}
+
+class _ProgressVideoPlayerState extends State<_ProgressVideoPlayer> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(widget.file)
+      ..initialize().then((_) {
+        if (mounted) setState(() => _initialized = true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: double.infinity,
+        height: 200,
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              _controller.value.isPlaying
+                  ? _controller.pause()
+                  : _controller.play();
+            });
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
+                ),
+              ),
+              if (!_controller.value.isPlaying)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+              // Duration badge
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.videocam,
+                          color: Colors.orangeAccent, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDuration(_controller.value.duration),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 }

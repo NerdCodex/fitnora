@@ -99,7 +99,8 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
                       const SizedBox(height: 24),
                       Center(
                         child: CustomImagePicker(
-                          initialImage: imagePath,
+                          initialMedia: imagePath,
+                          allowVideo: false,
                           onChange: (path) {
                             setState(() {
                               imagePath = path;

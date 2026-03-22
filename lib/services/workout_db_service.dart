@@ -93,7 +93,7 @@ class WorkoutDatabaseService {
         session_id INTEGER PRIMARY KEY AUTOINCREMENT,
         routine_id INTEGER,
         started_at INTEGER NOT NULL,
-        completed_at INTEGER,
+        completed_at INTEGER NOT NULL,
 
         FOREIGN KEY (routine_id) REFERENCES routine(routine_id) ON DELETE SET NULL
       );
@@ -904,5 +904,46 @@ class WorkoutDatabaseService {
       GROUP BY day_key
       ORDER BY day_key ASC
     ''');
+  }
+
+  // ================================================================
+  //  NOTIFICATION HELPERS — check if activity already logged today
+  // ================================================================
+
+  /// Returns true if at least one completed workout session exists today.
+  Future<bool> hasTodayWorkout() async {
+    final db = await database;
+    final now = DateTime.now();
+    final startOfDay =
+        DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final endOfDay =
+        DateTime(now.year, now.month, now.day, 23, 59, 59, 999)
+            .millisecondsSinceEpoch;
+
+    final result = await db.rawQuery(
+      '''SELECT COUNT(*) as cnt FROM workout_session
+         WHERE completed_at BETWEEN ? AND ?''',
+      [startOfDay, endOfDay],
+    );
+    return (result.first['cnt'] as int) > 0;
+  }
+
+  /// Returns a set of meal_type strings already logged today
+  /// (e.g. {'breakfast', 'lunch'}).
+  Future<Set<String>> getTodayMealTypes() async {
+    final db = await database;
+    final now = DateTime.now();
+    final startOfDay =
+        DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final endOfDay =
+        DateTime(now.year, now.month, now.day, 23, 59, 59, 999)
+            .millisecondsSinceEpoch;
+
+    final result = await db.rawQuery(
+      '''SELECT DISTINCT meal_type FROM meal_log
+         WHERE logged_at BETWEEN ? AND ?''',
+      [startOfDay, endOfDay],
+    );
+    return result.map((r) => (r['meal_type'] as String).toLowerCase()).toSet();
   }
 }

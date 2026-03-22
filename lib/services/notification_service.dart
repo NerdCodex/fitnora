@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:fitnora/services/user_session.dart';
+import 'package:fitnora/services/workout_db_service.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -51,28 +52,41 @@ class NotificationService {
     required String body,
     required TimeOfDay time,
   }) async {
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: _nextInstanceOfTime(time),
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_notifications',
-          'Daily Notifications',
-          channelDescription: 'Daily reminders for workout and meals',
-          importance: Importance.max,
-          priority: Priority.high,
+    // We schedule 7 days of individual alarms instead of using 
+    // DateTimeComponents.time, because DateTimeComponents ignores the "skip" date
+    // and fires today anyway if the time hasn't passed.
+    await cancelNotification(id);
+    
+    tz.TZDateTime scheduledDate = _nextInstanceOfTime(time);
+    
+    for (int i = 0; i < 7; i++) {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        // Use a unique ID for each day so they don't overwrite
+        id: id + (i * 100), 
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate.add(Duration(days: i)),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_notifications',
+            'Daily Notifications',
+            channelDescription: 'Daily reminders for workout and meals',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    }
   }
 
   Future<void> cancelNotification(int id) async {
+    // Cancel the base ID and the 7-day future IDs
     await flutterLocalNotificationsPlugin.cancel(id: id);
+    for (int i = 0; i < 7; i++) {
+      await flutterLocalNotificationsPlugin.cancel(id: id + (i * 100));
+    }
   }
 
   Future<void> cancelAllNotifications() async {
@@ -85,6 +99,8 @@ class NotificationService {
     required String body,
     required TimeOfDay time,
   }) async {
+    await cancelNotification(id);
+    
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     tz.TZDateTime scheduledDate = tz.TZDateTime(
       tz.local,
@@ -95,24 +111,26 @@ class NotificationService {
       time.minute,
     ).add(const Duration(days: 1)); // Skip today, start tomorrow
 
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: scheduledDate,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_notifications',
-          'Daily Notifications',
-          channelDescription: 'Daily reminders for workout and meals',
-          importance: Importance.max,
-          priority: Priority.high,
+    // Schedule 7 days out, starting tomorrow
+    for (int i = 0; i < 7; i++) {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id: id + (i * 100),
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate.add(Duration(days: i)),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_notifications',
+            'Daily Notifications',
+            channelDescription: 'Daily reminders for workout and meals',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    }
   }
 
   Future<void> markWorkoutDoneToday() async {
@@ -181,6 +199,28 @@ class NotificationService {
       body: body,
       time: time,
     );
+  }
+
+  /// Call on app startup (after user is logged in and DB is ready).
+  /// Checks what the user has already logged today and skips
+  /// today's notification for those items so they don't fire.
+  Future<void> syncNotificationsWithToday() async {
+    try {
+      final db = WorkoutDatabaseService.instance;
+
+      // 1. Check workout — skip today's reminder if already done
+      if (await db.hasTodayWorkout()) {
+        await markWorkoutDoneToday();
+      }
+
+      // 2. Check meals — skip today's reminder for each logged meal type
+      final loggedMeals = await db.getTodayMealTypes();
+      for (final mealType in loggedMeals) {
+        await markMealLoggedToday(mealType);
+      }
+    } catch (e) {
+      debugPrint('Notification sync error: $e');
+    }
   }
 
   TimeOfDay _parseTime(String timeString) {

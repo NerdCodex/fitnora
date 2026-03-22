@@ -114,10 +114,10 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       ),
                       const SizedBox(height: 20),
 
-                      // ============ PROGRESS IMAGE ============
+                      // ============ PROGRESS MEDIA (IMAGE / VIDEO) ============
                       Center(
-                        child: CustomImagePicker(
-                          initialImage: _imagePath,
+                        child: CustomMediaPicker(
+                          initialMedia: _imagePath,
                           onChange: (path) async {
                             if (path.isEmpty) {
                               setState(() {
@@ -126,8 +126,8 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                               });
                               return;
                             }
-                            // Save picked image to app document directory temporarily
-                            final savedName = await _saveImage(File(path));
+                            // Save picked media to app document directory temporarily
+                            final savedName = await _saveMedia(File(path));
                             final appDir = await getApplicationDocumentsDirectory();
                             final newPath = p.join(appDir.path, UserSession().imagesPath, savedName);
                             _unsavedImagePaths.add(newPath);
@@ -262,7 +262,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
     Navigator.pop(context, true);
   }
 
-  Future<String> _saveImage(File imageFile) async {
+  Future<String> _saveMedia(File mediaFile) async {
     final appDir = await getApplicationDocumentsDirectory();
     final imagesDir = Directory(p.join(appDir.path, UserSession().imagesPath));
 
@@ -272,10 +272,10 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
 
     final randomInt = Random().nextInt(999999999);
     final fileName =
-        "progress_image_$randomInt${p.extension(imageFile.path)}";
+        "progress_media_$randomInt${p.extension(mediaFile.path)}";
     final savedPath = p.join(imagesDir.path, fileName);
 
-    await imageFile.copy(savedPath);
+    await mediaFile.copy(savedPath);
     return fileName;
   }
 
