@@ -3,7 +3,6 @@ import 'package:fitnora/animations.dart';
 import 'package:fitnora/components/custom_bottom_sheet.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/workout/exercises/create_exercise.dart';
-import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
@@ -134,7 +133,8 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
     final confirm = await showConfirmDialog(
       context,
       title: "Delete Exercise?",
-      content: "Are you sure you want to delete \"${widget.exercise['exercise_name']}\"?",
+      content:
+          "Are you sure you want to delete \"${widget.exercise['exercise_name']}\"?",
       trueText: "DELETE",
       falseText: "CANCEL",
     );
@@ -142,7 +142,8 @@ class _CustomExerciseTileState extends State<CustomExerciseTile> {
     if (confirm != true) return;
 
     final exerciseId = widget.exercise['exercise_id'] as int;
-    final hasSessions = await WorkoutDatabaseService.instance.hasExerciseSessions(exerciseId);
+    final hasSessions = await WorkoutDatabaseService.instance
+        .hasExerciseSessions(exerciseId);
 
     if (hasSessions) {
       // Soft-delete: hide from lists but keep session history intact

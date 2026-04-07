@@ -6,7 +6,6 @@ import 'package:fitnora/components/custom_image_picker.dart';
 import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/components/dialog.dart';
-import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
@@ -47,7 +46,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
 
   Future<void> _loadMeasurement() async {
     setState(() => _isLoading = true);
-    final m = await WorkoutDatabaseService.instance.getMeasurement(widget.measurementId!);
+    final m = await WorkoutDatabaseService.instance.getMeasurement(
+      widget.measurementId!,
+    );
     if (m != null && mounted) {
       setState(() {
         _weightCtrl.text = m['weight']?.toString() ?? '';
@@ -75,10 +76,12 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
     for (var path in _unsavedImagePaths) {
       final file = File(path);
       if (file.existsSync()) {
-        try { file.deleteSync(); } catch (_) {}
+        try {
+          file.deleteSync();
+        } catch (_) {}
       }
     }
-    
+
     super.dispose();
   }
 
@@ -128,8 +131,13 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                             }
                             // Save picked media to app document directory temporarily
                             final savedName = await _saveMedia(File(path));
-                            final appDir = await getApplicationDocumentsDirectory();
-                            final newPath = p.join(appDir.path, UserSession().imagesPath, savedName);
+                            final appDir =
+                                await getApplicationDocumentsDirectory();
+                            final newPath = p.join(
+                              appDir.path,
+                              UserSession().imagesPath,
+                              savedName,
+                            );
                             _unsavedImagePaths.add(newPath);
 
                             setState(() {
@@ -145,7 +153,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       AppTextField(
                         hintText: "e.g. 75",
                         controller: _weightCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
 
                       const SizedBox(height: 10),
@@ -153,7 +163,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       AppTextField(
                         hintText: "e.g. 175",
                         controller: _heightCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
 
                       const SizedBox(height: 10),
@@ -161,7 +173,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       AppTextField(
                         hintText: "e.g. 15",
                         controller: _bodyFatCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
 
                       const SizedBox(height: 20),
@@ -179,7 +193,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       AppTextField(
                         hintText: "e.g. 100",
                         controller: _chestCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
 
                       const SizedBox(height: 10),
@@ -187,7 +203,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       AppTextField(
                         hintText: "e.g. 80",
                         controller: _waistCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
 
                       const SizedBox(height: 10),
@@ -195,7 +213,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
                       AppTextField(
                         hintText: "e.g. 95",
                         controller: _hipsCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
 
                       const SizedBox(height: 32),
@@ -219,7 +239,9 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
 
     // If editing, keep reference of old image
     if (_isEdit) {
-      final old = await WorkoutDatabaseService.instance.getMeasurement(widget.measurementId!);
+      final old = await WorkoutDatabaseService.instance.getMeasurement(
+        widget.measurementId!,
+      );
       oldImageFileName = old?['progress_image']?.toString() ?? "";
     }
 
@@ -271,8 +293,7 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
     }
 
     final randomInt = Random().nextInt(999999999);
-    final fileName =
-        "progress_media_$randomInt${p.extension(mediaFile.path)}";
+    final fileName = "progress_media_$randomInt${p.extension(mediaFile.path)}";
     final savedPath = p.join(imagesDir.path, fileName);
 
     await mediaFile.copy(savedPath);
@@ -297,7 +318,8 @@ class _AddMeasurementPageState extends State<AddMeasurementPage> {
   void _goBack(bool didPop, dynamic result) async {
     if (didPop) return;
 
-    final hasInput = _weightCtrl.text.isNotEmpty ||
+    final hasInput =
+        _weightCtrl.text.isNotEmpty ||
         _heightCtrl.text.isNotEmpty ||
         _bodyFatCtrl.text.isNotEmpty ||
         _imageChanged;

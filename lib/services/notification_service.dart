@@ -29,9 +29,8 @@ class NotificationService {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
+    final InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
 
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
@@ -40,8 +39,10 @@ class NotificationService {
 
   Future<void> requestPermissions() async {
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+        flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
     await androidImplementation?.requestNotificationsPermission();
     await androidImplementation?.requestExactAlarmsPermission();
   }
@@ -52,17 +53,17 @@ class NotificationService {
     required String body,
     required TimeOfDay time,
   }) async {
-    // We schedule 7 days of individual alarms instead of using 
+    // We schedule 7 days of individual alarms instead of using
     // DateTimeComponents.time, because DateTimeComponents ignores the "skip" date
     // and fires today anyway if the time hasn't passed.
     await cancelNotification(id);
-    
+
     tz.TZDateTime scheduledDate = _nextInstanceOfTime(time);
-    
+
     for (int i = 0; i < 7; i++) {
       await flutterLocalNotificationsPlugin.zonedSchedule(
         // Use a unique ID for each day so they don't overwrite
-        id: id + (i * 100), 
+        id: id + (i * 100),
         title: title,
         body: body,
         scheduledDate: scheduledDate.add(Duration(days: i)),
@@ -100,7 +101,7 @@ class NotificationService {
     required TimeOfDay time,
   }) async {
     await cancelNotification(id);
-    
+
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     tz.TZDateTime scheduledDate = tz.TZDateTime(
       tz.local,
@@ -157,6 +158,7 @@ class NotificationService {
     String body;
     String timeStr;
 
+    // Schedule the notification for the next 7 days
     switch (mealType.toLowerCase()) {
       case 'breakfast':
         if (!(box.get('breakfast_enabled', defaultValue: true) as bool)) return;
@@ -193,12 +195,7 @@ class NotificationService {
 
     final time = _parseTime(timeStr);
 
-    await skipTodayNotification(
-      id: id,
-      title: title,
-      body: body,
-      time: time,
-    );
+    await skipTodayNotification(id: id, title: title, body: body, time: time);
   }
 
   /// Call on app startup (after user is logged in and DB is ready).

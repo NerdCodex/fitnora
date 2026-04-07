@@ -1,4 +1,3 @@
-
 import 'dart:io';
 
 import 'package:fitnora/components/alert.dart';
@@ -6,7 +5,6 @@ import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
 import 'package:fitnora/pages/workout/routine/select_exercise.dart';
-import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
@@ -65,8 +63,9 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
   Future<void> _loadRoutineForEdit() async {
     setState(() => _loading = true);
 
-    final routine = await WorkoutDatabaseService.instance
-        .getRoutineForEdit(widget.routineId!);
+    final routine = await WorkoutDatabaseService.instance.getRoutineForEdit(
+      widget.routineId!,
+    );
 
     _nameController.text = routine['routine_name'];
 
@@ -107,8 +106,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
           actions: [
             TextButton(
               onPressed: _loading ? null : _saveRoutine,
-              child: const Text("Save",
-                  style: TextStyle(color: Colors.blue)),
+              child: const Text("Save", style: TextStyle(color: Colors.blue)),
             ),
           ],
           actionsPadding: const EdgeInsets.only(right: 10),
@@ -129,8 +127,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
                     Padding(
                       padding: const EdgeInsets.only(left: 12),
                       child: Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             "Exercises",
@@ -145,105 +142,84 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
                             icon: const Icon(Icons.add, size: 18),
                             label: const Text("Add"),
                             style: TextButton.styleFrom(
-                                foregroundColor: Colors.blue),
+                              foregroundColor: Colors.blue,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     Expanded(
                       child: Padding(
-                        padding:
-                            const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.only(bottom: 16),
                         child: Container(
                           decoration: BoxDecoration(
                             color: const Color(0xFF121212),
-                            borderRadius:
-                                BorderRadius.circular(16),
-                            border: Border.all(
-                                color: Colors.white12),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white12),
                           ),
                           child: _exercises.isEmpty
                               ? const RoutineEmpty()
                               : ReorderableListView.builder(
                                   itemCount: _exercises.length,
-                                  onReorder:
-                                      (oldIndex, newIndex) {
+                                  onReorder: (oldIndex, newIndex) {
                                     setState(() {
                                       if (newIndex > oldIndex) {
                                         newIndex--;
                                       }
-                                      final item =
-                                          _exercises.removeAt(
-                                              oldIndex);
-                                      _exercises.insert(
-                                          newIndex, item);
+                                      final item = _exercises.removeAt(
+                                        oldIndex,
+                                      );
+                                      _exercises.insert(newIndex, item);
                                     });
                                   },
-                                  itemBuilder:
-                                      (context, index) {
-                                    final ex =
-                                        _exercises[index];
+                                  itemBuilder: (context, index) {
+                                    final ex = _exercises[index];
                                     return Dismissible(
-                                      key: ValueKey(
-                                          ex.exerciseId),
-                                      direction:
-                                          DismissDirection
-                                              .endToStart,
+                                      key: ValueKey(ex.exerciseId),
+                                      direction: DismissDirection.endToStart,
                                       background: Container(
-                                        alignment: Alignment
-                                            .centerRight,
-                                        padding:
-                                            const EdgeInsets
-                                                .only(
-                                                    right: 16),
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(
+                                          right: 16,
+                                        ),
                                         color: Colors.red,
                                         child: const Icon(
                                           Icons.delete,
-                                          color:
-                                              Colors.white,
+                                          color: Colors.white,
                                         ),
                                       ),
                                       onDismissed: (_) {
-                                        setState(() =>
-                                            _exercises
-                                                .removeAt(
-                                                    index));
+                                        setState(
+                                          () => _exercises.removeAt(index),
+                                        );
                                       },
                                       child: Column(
                                         children: [
                                           ListTile(
-                                            leading:
-                                                _exerciseAvatar(
-                                                    ex.exerciseImage),
+                                            leading: _exerciseAvatar(
+                                              ex.exerciseImage,
+                                            ),
                                             title: Text(
                                               ex.exerciseName,
-                                              style:
-                                                  const TextStyle(
-                                                      color:
-                                                          Colors
-                                                              .white),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                              ),
                                             ),
                                             subtitle: Text(
                                               "${ex.exerciseEquipment} | ${ex.exerciseType}",
-                                              style:
-                                                  const TextStyle(
-                                                      color:
-                                                          Colors
-                                                              .white54),
+                                              style: const TextStyle(
+                                                color: Colors.white54,
+                                              ),
                                             ),
-                                            trailing:
-                                                const Icon(
-                                              Icons
-                                                  .drag_handle,
-                                              color: Colors
-                                                  .white54,
+                                            trailing: const Icon(
+                                              Icons.drag_handle,
+                                              color: Colors.white54,
                                             ),
                                           ),
                                           const Divider(
                                             height: 1,
                                             indent: 72,
-                                            color: Colors
-                                                .white12,
+                                            color: Colors.white12,
                                           ),
                                         ],
                                       ),
@@ -271,8 +247,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
         return CircleAvatar(
           radius: 22,
           backgroundColor: const Color(0xFF1E1E1E),
-          backgroundImage:
-              file != null ? FileImage(file) : null,
+          backgroundImage: file != null ? FileImage(file) : null,
           child: file == null
               ? ClipOval(
                   child: Image.asset(
@@ -288,17 +263,13 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
     );
   }
 
-  Future<File?> _resolveExerciseImage(
-      String? imageName) async {
-    if (imageName == null || imageName.isEmpty){
+  Future<File?> _resolveExerciseImage(String? imageName) async {
+    if (imageName == null || imageName.isEmpty) {
       return null;
     }
-      
 
-    final dir =
-        await getApplicationDocumentsDirectory();
-    final file =
-        File('${dir.path}/${UserSession().imagesPath}/$imageName');
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/${UserSession().imagesPath}/$imageName');
 
     return file.existsSync() ? file : null;
   }
@@ -306,13 +277,11 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
   // ================= SELECT =================
 
   Future<void> _openSelectExercise() async {
-    final result =
-        await Navigator.push<List<Map<String, dynamic>>>(
+    final result = await Navigator.push<List<Map<String, dynamic>>>(
       context,
       MaterialPageRoute(
         builder: (_) => SelectExercisePage(
-          alreadySelectedIds:
-              _exercises.map((e) => e.exerciseId).toSet(),
+          alreadySelectedIds: _exercises.map((e) => e.exerciseId).toSet(),
         ),
       ),
     );
@@ -321,18 +290,15 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
 
     setState(() {
       for (final ex in result) {
-        if (_exercises.any(
-            (e) => e.exerciseId == ex['exercise_id'])) {
-              continue;
-            }
-          
+        if (_exercises.any((e) => e.exerciseId == ex['exercise_id'])) {
+          continue;
+        }
 
         _exercises.add(
           RoutineExercise(
             exerciseId: ex['exercise_id'],
             exerciseName: ex['exercise_name'],
-            exerciseEquipment:
-                ex['exercise_equipment'],
+            exerciseEquipment: ex['exercise_equipment'],
             exerciseImage: ex['exercise_image'],
             exerciseType: ex['exercise_type'],
           ),
@@ -347,21 +313,18 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
     final name = _nameController.text.trim();
 
     if (name.isEmpty) {
-      showMessageDialog(
-          context, "Routine name cannot be empty");
+      showMessageDialog(context, "Routine name cannot be empty");
       return;
     }
 
     if (_exercises.isEmpty) {
-      showMessageDialog(
-          context, "Add at least one exercise");
+      showMessageDialog(context, "Add at least one exercise");
       return;
     }
 
     final payload = {
       "routine_name": name,
-      "exercises":
-          _exercises.asMap().entries.map((entry) {
+      "exercises": _exercises.asMap().entries.map((entry) {
         return {
           "exercise_id": entry.value.exerciseId,
           "exercise_order": entry.key,
@@ -375,8 +338,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
         data: payload,
       );
     } else {
-      await WorkoutDatabaseService.instance
-          .addRoutine(payload);
+      await WorkoutDatabaseService.instance.addRoutine(payload);
     }
 
     if (!mounted) return;
@@ -390,10 +352,8 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
 
     final exit = await showConfirmDialog(
       context,
-      title:
-          "Do you want to stop creating routine?",
-      content:
-          "if you stop now, you'll lose any progress you've made.",
+      title: "Do you want to stop creating routine?",
+      content: "if you stop now, you'll lose any progress you've made.",
       trueText: "EXIT",
       falseText: "CONTINUE",
     );
@@ -413,20 +373,15 @@ class RoutineEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.fitness_center_outlined,
-              size: 42, color: Colors.white24),
+          Icon(Icons.fitness_center_outlined, size: 42, color: Colors.white24),
           SizedBox(height: 12),
-          Text("No exercises added",
-              style:
-                  TextStyle(color: Colors.white54)),
+          Text("No exercises added", style: TextStyle(color: Colors.white54)),
           SizedBox(height: 6),
           Text(
             "Tap Add to build your routine",
-            style:
-                TextStyle(color: Colors.white30),
+            style: TextStyle(color: Colors.white30),
           ),
         ],
       ),

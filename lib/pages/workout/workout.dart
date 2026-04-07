@@ -352,7 +352,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
     );
     final dateStr =
         "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
-    final runtime = session['completed_at'] != null
+    final runtime = session['completed_at'] != null && session['completed_at'] != 0
         ? " · ${((session['completed_at'] - session['started_at']) / 60000).toStringAsFixed(0)} min"
         : " · In Progress";
 

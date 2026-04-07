@@ -1,5 +1,4 @@
 import 'package:fitnora/animations.dart';
-import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/components/search_field.dart';
 import 'package:fitnora/pages/food/add_food.dart';
@@ -58,7 +57,8 @@ class _ViewFoodsPageState extends State<ViewFoodsPage> {
     final confirm = await showConfirmDialog(
       context,
       title: "Delete Food Item?",
-      content: "Are you sure you want to delete this food item? This won't affect past meal logs.",
+      content:
+          "Are you sure you want to delete this food item? This will affect past meal logs.",
       trueText: "DELETE",
       falseText: "CANCEL",
     );
@@ -95,19 +95,19 @@ class _ViewFoodsPageState extends State<ViewFoodsPage> {
             Expanded(
               child: _isLoaded
                   ? _filteredFoods.isNotEmpty
-                      ? ListView.separated(
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: _filteredFoods.length,
-                          separatorBuilder: (_, __) => const Divider(
-                            color: Color(0xFF1E1E1E),
-                            height: 1,
-                          ),
-                          itemBuilder: (context, index) {
-                            final food = _filteredFoods[index];
-                            return _buildFoodTile(food);
-                          },
-                        )
-                      : const _NoFoodFound()
+                        ? ListView.separated(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _filteredFoods.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              color: Color(0xFF1E1E1E),
+                              height: 1,
+                            ),
+                            itemBuilder: (context, index) {
+                              final food = _filteredFoods[index];
+                              return _buildFoodTile(food);
+                            },
+                          )
+                        : const _NoFoodFound()
                   : const Center(child: CircularProgressIndicator()),
             ),
           ],
@@ -158,7 +158,11 @@ class _ViewFoodsPageState extends State<ViewFoodsPage> {
             onPressed: () => _openAddPage(foodId: food['food_id']),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+            icon: const Icon(
+              Icons.delete_outline,
+              color: Colors.redAccent,
+              size: 20,
+            ),
             onPressed: () => _deleteFood(food['food_id'] as int),
           ),
         ],
@@ -172,9 +176,7 @@ class _ViewFoodsPageState extends State<ViewFoodsPage> {
     // and let the user create a new one, or we can update AddFoodPage to support editing.
     final result = await Navigator.push(
       context,
-      AppRoutes.slideFromRight(
-        AddFoodPage(foodId: foodId),
-      ),
+      AppRoutes.slideFromRight(AddFoodPage(foodId: foodId)),
     );
     if (result == true) {
       await _loadFoods();
@@ -191,11 +193,7 @@ class _NoFoodFound extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.fastfood_outlined,
-            color: Colors.white24,
-            size: 64,
-          ),
+          Icon(Icons.fastfood_outlined, color: Colors.white24, size: 64),
           const SizedBox(height: 16),
           const Text(
             "No Food Items Found",

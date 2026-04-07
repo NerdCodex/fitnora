@@ -170,6 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final confirm = await showConfirmationDialog(context, "Warning", "Backing up will overwrite your previously uploaded backup on the server. Do you want to continue?");
     if (confirm != true) return;
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoadingScreen()),
@@ -192,6 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final confirm = await showConfirmationDialog(context, "Warning", "Restoring a backup will flush out your current local data and replace it. Do you want to continue?");
     if (confirm != true) return;
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoadingScreen()),

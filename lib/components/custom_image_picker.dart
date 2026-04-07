@@ -191,7 +191,6 @@ class _CustomMediaPickerState extends State<CustomMediaPicker> {
   Future<void> _onPickVideo(ImageSource source) async {
     final XFile? picked = await _picker.pickVideo(
       source: source,
-      maxDuration: const Duration(seconds: 30),
     );
     if (picked == null) return;
 
@@ -273,7 +272,7 @@ class _CustomMediaPickerState extends State<CustomMediaPicker> {
                   ListTile(
                     leading:
                         const Icon(Icons.videocam, color: Colors.orangeAccent),
-                    title: const Text("Record Video (30s max)",
+                    title: const Text("Record Video",
                         style: TextStyle(color: Colors.white)),
                     onTap: () {
                       Navigator.pop(context);

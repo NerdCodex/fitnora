@@ -1,6 +1,4 @@
-
 import 'package:fitnora/animations.dart';
-import 'package:fitnora/pages/food/add_food.dart';
 import 'package:fitnora/pages/food/log_meal.dart';
 import 'package:fitnora/pages/food/view_foods.dart';
 import 'package:fitnora/services/workout_db_service.dart';
@@ -37,10 +35,12 @@ class _FoodPageState extends State<FoodPage> {
     setState(() => _loading = true);
     final nutrition = await WorkoutDatabaseService.instance
         .getDailyNutritionSummary(_selectedDate);
-    final meals =
-        await WorkoutDatabaseService.instance.getMealsByDate(_selectedDate);
+    final meals = await WorkoutDatabaseService.instance.getMealsByDate(
+      _selectedDate,
+    );
     // Load all tracked dates for dot indicators
-    final allHistory = await WorkoutDatabaseService.instance.getNutritionHistory();
+    final allHistory = await WorkoutDatabaseService.instance
+        .getNutritionHistory();
     final trackedDates = <String>{};
     for (var n in allHistory) {
       final ts = (n['logged_at'] as num).toInt();
@@ -90,8 +90,11 @@ class _FoodPageState extends State<FoodPage> {
                       lastDay: DateTime.now().add(const Duration(days: 365)),
                       focusedDay: _focusedDate,
                       calendarFormat: CalendarFormat.week,
-                      availableCalendarFormats: const {CalendarFormat.week: 'Week'},
-                      selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                      availableCalendarFormats: const {
+                        CalendarFormat.week: 'Week',
+                      },
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDate, day),
                       onDaySelected: (selectedDay, focusedDay) {
                         setState(() {
                           _selectedDate = selectedDay;
@@ -102,9 +105,19 @@ class _FoodPageState extends State<FoodPage> {
                       headerStyle: const HeaderStyle(
                         formatButtonVisible: false,
                         titleCentered: true,
-                        titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                        titleTextStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        leftChevronIcon: Icon(
+                          Icons.chevron_left,
+                          color: Colors.white,
+                        ),
+                        rightChevronIcon: Icon(
+                          Icons.chevron_right,
+                          color: Colors.white,
+                        ),
                       ),
                       daysOfWeekStyle: const DaysOfWeekStyle(
                         weekdayStyle: TextStyle(color: Colors.white70),
@@ -116,14 +129,21 @@ class _FoodPageState extends State<FoodPage> {
                         weekendTextStyle: TextStyle(color: Colors.white),
                       ),
                       calendarBuilders: CalendarBuilders(
-                        defaultBuilder: (context, day, focusedDay) => _buildFoodCalendarCell(day, isSelected: false),
-                        todayBuilder: (context, day, focusedDay) => _buildFoodCalendarCell(day, isSelected: false, isToday: true),
-                        selectedBuilder: (context, day, focusedDay) => _buildFoodCalendarCell(day, isSelected: true),
+                        defaultBuilder: (context, day, focusedDay) =>
+                            _buildFoodCalendarCell(day, isSelected: false),
+                        todayBuilder: (context, day, focusedDay) =>
+                            _buildFoodCalendarCell(
+                              day,
+                              isSelected: false,
+                              isToday: true,
+                            ),
+                        selectedBuilder: (context, day, focusedDay) =>
+                            _buildFoodCalendarCell(day, isSelected: true),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // ================= NUTRITION SUMMARY =================
                   _buildNutritionCard(),
                   const SizedBox(height: 24),
@@ -140,7 +160,11 @@ class _FoodPageState extends State<FoodPage> {
   }
   // ================= FOOD CALENDAR CELL =================
 
-  Widget _buildFoodCalendarCell(DateTime day, {required bool isSelected, bool isToday = false}) {
+  Widget _buildFoodCalendarCell(
+    DateTime day, {
+    required bool isSelected,
+    bool isToday = false,
+  }) {
     final key = '${day.year}-${day.month}-${day.day}';
     final hasTracking = _trackedFoodDates.contains(key);
 
@@ -158,8 +182,12 @@ class _FoodPageState extends State<FoodPage> {
           Text(
             '${day.day}',
             style: TextStyle(
-              color: isSelected ? Colors.white : (isToday ? Colors.blue : Colors.white),
-              fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+              color: isSelected
+                  ? Colors.white
+                  : (isToday ? Colors.blue : Colors.white),
+              fontWeight: isSelected || isToday
+                  ? FontWeight.bold
+                  : FontWeight.normal,
             ),
           ),
           if (hasTracking) ...[
@@ -241,7 +269,11 @@ class _FoodPageState extends State<FoodPage> {
           Row(
             children: [
               _buildMacro("Protein", _nutrition['protein']!, Colors.redAccent),
-              _buildMacro("Carbs", _nutrition['carbs']!, Colors.lightBlueAccent),
+              _buildMacro(
+                "Carbs",
+                _nutrition['carbs']!,
+                Colors.lightBlueAccent,
+              ),
               _buildMacro("Fat", _nutrition['fat']!, Colors.orangeAccent),
             ],
           ),
@@ -263,10 +295,7 @@ class _FoodPageState extends State<FoodPage> {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
-          ),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );
@@ -275,13 +304,11 @@ class _FoodPageState extends State<FoodPage> {
   // ================= MEAL SECTION =================
 
   Widget _buildMealSection(String mealType, IconData icon) {
-    final filtered = _meals
-        .where((m) => m['meal_type'] == mealType)
-        .toList();
+    final filtered = _meals.where((m) => m['meal_type'] == mealType).toList();
 
     double totalCals = 0;
     for (var m in filtered) {
-       totalCals += (m['calories'] as num) * (m['servings'] as num);
+      totalCals += (m['calories'] as num) * (m['servings'] as num);
     }
 
     return Container(
@@ -321,7 +348,7 @@ class _FoodPageState extends State<FoodPage> {
               ],
             ),
           ),
-          
+
           if (filtered.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -343,9 +370,12 @@ class _FoodPageState extends State<FoodPage> {
   Widget _buildMealTile(Map<String, dynamic> meal) {
     final cal = ((meal['calories'] as num) * (meal['servings'] as num))
         .toStringAsFixed(0);
-    final protein = ((meal['protein'] as num) * (meal['servings'] as num)).toStringAsFixed(1);
-    final carbs = ((meal['carbs'] as num) * (meal['servings'] as num)).toStringAsFixed(1);
-    final fat = ((meal['fat'] as num) * (meal['servings'] as num)).toStringAsFixed(1);
+    final protein = ((meal['protein'] as num) * (meal['servings'] as num))
+        .toStringAsFixed(1);
+    final carbs = ((meal['carbs'] as num) * (meal['servings'] as num))
+        .toStringAsFixed(1);
+    final fat = ((meal['fat'] as num) * (meal['servings'] as num))
+        .toStringAsFixed(1);
 
     return InkWell(
       onTap: () => _showMealOptionsSheet(meal),
@@ -432,15 +462,24 @@ class _FoodPageState extends State<FoodPage> {
               const Divider(color: Colors.white12, height: 1),
               ListTile(
                 leading: const Icon(Icons.edit, color: Colors.blue),
-                title: const Text("Edit Serving Size", style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  "Edit Serving Size",
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _editServingSize(meal);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.drive_file_move, color: Colors.orange),
-                title: const Text("Move to...", style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.drive_file_move,
+                  color: Colors.orange,
+                ),
+                title: const Text(
+                  "Move to...",
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _moveOrCopyMeal(meal, isCopy: false);
@@ -448,7 +487,10 @@ class _FoodPageState extends State<FoodPage> {
               ),
               ListTile(
                 leading: const Icon(Icons.copy, color: Colors.green),
-                title: const Text("Copy to...", style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  "Copy to...",
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _moveOrCopyMeal(meal, isCopy: true);
@@ -456,10 +498,15 @@ class _FoodPageState extends State<FoodPage> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text("Delete", style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  "Delete",
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () async {
                   Navigator.pop(context);
-                  await WorkoutDatabaseService.instance.deleteMealLog(meal['meal_log_id'] as int);
+                  await WorkoutDatabaseService.instance.deleteMealLog(
+                    meal['meal_log_id'] as int,
+                  );
                   _loadData();
                 },
               ),
@@ -479,7 +526,10 @@ class _FoodPageState extends State<FoodPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        title: const Text("Edit Serving Amount", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Edit Serving Amount",
+          style: TextStyle(color: Colors.white),
+        ),
         content: TextField(
           controller: ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -487,7 +537,9 @@ class _FoodPageState extends State<FoodPage> {
           decoration: const InputDecoration(
             suffixText: "g",
             suffixStyle: TextStyle(color: Colors.white54),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue),
+            ),
           ),
         ),
         actions: [
@@ -515,7 +567,10 @@ class _FoodPageState extends State<FoodPage> {
     }
   }
 
-  Future<void> _moveOrCopyMeal(Map<String, dynamic> meal, {required bool isCopy}) async {
+  Future<void> _moveOrCopyMeal(
+    Map<String, dynamic> meal, {
+    required bool isCopy,
+  }) async {
     final types = ["Breakfast", "Lunch", "Dinner", "Snack"];
     types.remove(meal['meal_type']);
 
@@ -523,7 +578,10 @@ class _FoodPageState extends State<FoodPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        title: Text(isCopy ? "Copy to..." : "Move to...", style: const TextStyle(color: Colors.white)),
+        title: Text(
+          isCopy ? "Copy to..." : "Move to...",
+          style: const TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: types.map((t) {
@@ -542,7 +600,7 @@ class _FoodPageState extends State<FoodPage> {
           'food_id': meal['food_id'],
           'meal_type': result,
           'servings': meal['servings'],
-          'logged_at': meal['logged_at'], 
+          'logged_at': meal['logged_at'],
         });
       } else {
         await WorkoutDatabaseService.instance.updateMealLog(
@@ -559,13 +617,15 @@ class _FoodPageState extends State<FoodPage> {
   Future<void> _goLogMeal({String? prefillType}) async {
     final result = await Navigator.push(
       context,
-      AppRoutes.slideFromRight(LogMealPage(loggedDate: _selectedDate, initialMealType: prefillType)),
+      AppRoutes.slideFromRight(
+        LogMealPage(loggedDate: _selectedDate, initialMealType: prefillType),
+      ),
     );
     if (result == true) _loadData();
   }
 
   Future<void> _goViewFoods() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       AppRoutes.slideFromRight(const ViewFoodsPage()),
     );

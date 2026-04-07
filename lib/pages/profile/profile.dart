@@ -6,7 +6,6 @@ import 'package:fitnora/components/custom_image_picker.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/profile/add_measurement.dart';
 import 'package:fitnora/pages/profile/settings.dart';
-import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -29,6 +28,7 @@ class ProfilePageState extends State<ProfilePage> {
   String _selectedNutritionMetric = 'Calories'; // Calories | Protein | Carbs
   String _selectedWorkoutMetric = 'Volume'; // Volume | Reps | Seconds
   String _selectedWorkoutRange = 'Last 3 months';
+  String _selectedBodyRange = 'Last 3 months';
 
   DateTime _focusedDate = DateTime.now();
   DateTime _selectedDate = DateTime.now();
@@ -450,68 +450,145 @@ class ProfilePageState extends State<ProfilePage> {
 
   // ================= GRAPH 1: Body Weight + Body Fat =================
 
+  List<Map<String, dynamic>> _filterMeasurementsByRange(
+    List<Map<String, dynamic>> measurements,
+  ) {
+    final now = DateTime.now();
+    DateTime cutoff;
+    switch (_selectedBodyRange) {
+      case 'Last 7 days':
+        cutoff = now.subtract(const Duration(days: 7));
+        break;
+      case 'Last month':
+        cutoff = now.subtract(const Duration(days: 30));
+        break;
+      case 'Last 6 months':
+        cutoff = now.subtract(const Duration(days: 180));
+        break;
+      case 'All time':
+        return List<Map<String, dynamic>>.from(measurements);
+      default: // Last 3 months
+        cutoff = now.subtract(const Duration(days: 90));
+    }
+    final cutoffMs = cutoff.millisecondsSinceEpoch;
+    return measurements.where((m) => (m['measured_at'] as int) >= cutoffMs).toList();
+  }
+
   Widget _buildBodyGraph() {
-    final sortedHistory = List<Map<String, dynamic>>.from(_history)
-      ..sort(
-        (a, b) => (a['measured_at'] as int).compareTo(b['measured_at'] as int),
-      );
+    final filteredHistory = _filterMeasurementsByRange(_history)
+      ..sort((a, b) => (a['measured_at'] as int).compareTo(b['measured_at'] as int));
 
-    if (sortedHistory.isEmpty) return const SizedBox();
+    if (filteredHistory.isEmpty) return const SizedBox();
 
-    final earliest = sortedHistory.first['measured_at'] as int;
+    final earliest = filteredHistory.first['measured_at'] as int;
     final weightSpots = <FlSpot>[];
     final bfSpots = <FlSpot>[];
     final dateLabels = <double, String>{};
+    final Set<double> visibleKeys = {};
+    double sumW = 0;
+    int countW = 0;
     double maxW = 0;
 
-    for (var m in sortedHistory) {
-      final days =
-          ((m['measured_at'] as int) - earliest) / (1000 * 60 * 60 * 24);
+    int N = filteredHistory.length;
+    if (N <= 7) {
+      for (int i = 0; i < N; i++) visibleKeys.add(i.toDouble());
+    } else {
+      for (int i = 0; i < 7; i++) {
+        visibleKeys.add((i * (N - 1) / 6).roundToDouble());
+      }
+    }
+
+    for (int i = 0; i < filteredHistory.length; i++) {
+      var m = filteredHistory[i];
+      final xIdx = i.toDouble();
       final dt = DateTime.fromMillisecondsSinceEpoch(m['measured_at'] as int);
-      dateLabels[days] = '${dt.day}/${dt.month}';
+      dateLabels[xIdx] = '${dt.day}/${dt.month}';
 
       final w = (m['weight'] as num?)?.toDouble() ?? 0;
       if (w > 0) {
-        weightSpots.add(FlSpot(days, w));
+        weightSpots.add(FlSpot(xIdx, w));
+        sumW += w;
+        countW++;
         if (w > maxW) maxW = w;
       }
       final bf = (m['body_fat'] as num?)?.toDouble() ?? 0;
       if (bf > 0) {
-        // Scale body fat to weight range for dual-axis visualization
-        bfSpots.add(FlSpot(days, bf));
+        bfSpots.add(FlSpot(xIdx, bf));
       }
     }
 
-    // If we have both, normalize body fat to weight scale
     final normalizedBf = <FlSpot>[];
     if (bfSpots.isNotEmpty && maxW > 0) {
       for (var s in bfSpots) {
-        normalizedBf.add(FlSpot(s.x, s.y * maxW / 50)); // assume BF max ~50%
+        normalizedBf.add(FlSpot(s.x, s.y * maxW / 50));
       }
     }
 
     final maxY = maxW > 0 ? maxW * 1.2 : 100.0;
+    if (weightSpots.isEmpty && normalizedBf.isEmpty) return const SizedBox();
+
+    String avgText = countW > 0 ? "${(sumW / countW).toStringAsFixed(1)} kg avg" : "No weight logs";
 
     return _buildChartContainer(
       title: "Body Weight & Fat",
+      customHeader: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          RichText(
+            text: TextSpan(
+              children: [
+                const TextSpan(
+                  text: "Weight Progress",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                TextSpan(
+                  text: "\n$avgText",
+                  style: const TextStyle(color: Colors.blueAccent, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          DropdownButton<String>(
+            value: _selectedBodyRange,
+            dropdownColor: Colors.grey.shade800,
+            style: const TextStyle(color: Colors.blueAccent, fontSize: 14),
+            underline: const SizedBox(),
+            icon: const Icon(
+              Icons.arrow_drop_down,
+              color: Colors.blueAccent,
+            ),
+            items: [
+              'Last 7 days',
+              'Last month',
+              'Last 3 months',
+              'Last 6 months',
+              'All time',
+            ].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedBodyRange = val);
+            },
+          ),
+        ],
+      ),
       legends: [
         _buildLegend(Colors.blueAccent, "Weight (kg)"),
-        if (normalizedBf.isNotEmpty)
-          _buildLegend(Colors.orangeAccent, "Body Fat (%)"),
+        if (normalizedBf.isNotEmpty) _buildLegend(Colors.orangeAccent, "Body Fat (%)"),
       ],
       chart: LineChart(
         LineChartData(
           minY: 0,
           maxY: maxY,
           gridData: const FlGridData(show: false),
-          titlesData: _chartTitles(maxY, dateLabels),
+          titlesData: _chartTitles(maxY, dateLabels, visibleKeys),
           borderData: FlBorderData(show: false),
           lineTouchData: _tooltipData(dateLabels, "kg"),
           lineBarsData: [
-            if (weightSpots.isNotEmpty)
-              _lineBar(weightSpots, Colors.blueAccent),
-            if (normalizedBf.isNotEmpty)
-              _lineBar(normalizedBf, Colors.orangeAccent),
+            if (weightSpots.isNotEmpty) _lineBar(weightSpots, Colors.blueAccent),
+            if (normalizedBf.isNotEmpty) _lineBar(normalizedBf, Colors.orangeAccent),
           ],
         ),
       ),
@@ -522,25 +599,27 @@ class ProfilePageState extends State<ProfilePage> {
 
   /// Filter sessions by the selected time range.
   List<Map<String, dynamic>> _filterSessionsByRange(
-      List<Map<String, dynamic>> sessions) {
+    List<Map<String, dynamic>> sessions,
+  ) {
     final now = DateTime.now();
     DateTime cutoff;
     switch (_selectedWorkoutRange) {
+      case 'Last 7 days':
+        cutoff = now.subtract(const Duration(days: 7));
+        break;
       case 'Last month':
-        cutoff = DateTime(now.year, now.month - 1, now.day);
+        cutoff = now.subtract(const Duration(days: 30));
         break;
       case 'Last 6 months':
-        cutoff = DateTime(now.year, now.month - 6, now.day);
+        cutoff = now.subtract(const Duration(days: 180));
         break;
       case 'All time':
         return sessions;
       default: // Last 3 months
-        cutoff = DateTime(now.year, now.month - 3, now.day);
+        cutoff = now.subtract(const Duration(days: 90));
     }
     final cutoffMs = cutoff.millisecondsSinceEpoch;
-    return sessions
-        .where((s) => (s['started_at'] as int) >= cutoffMs)
-        .toList();
+    return sessions.where((s) => (s['started_at'] as int) >= cutoffMs).toList();
   }
 
   Widget _buildWorkoutSessionGraph() {
@@ -552,29 +631,22 @@ class ProfilePageState extends State<ProfilePage> {
     final filtered = _filterSessionsByRange(sortedSessions);
     if (filtered.isEmpty) return const SizedBox();
 
-    // ── Compute this-week summary for the header ──
-    final now = DateTime.now();
-    final weekStart =
-        DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-    final weekStartMs = weekStart.millisecondsSinceEpoch;
-
-    double weekTotal = 0;
-    for (var s in _sessions) {
-      if ((s['started_at'] as int) >= weekStartMs) {
-        switch (_selectedWorkoutMetric) {
-          case 'Reps':
-            weekTotal += (s['total_reps'] as num?)?.toDouble() ?? 0;
-            break;
-          case 'Seconds':
-            weekTotal += (s['total_seconds'] as num?)?.toDouble() ?? 0;
-            break;
-          default: // Volume
-            weekTotal += (s['total_volume'] as num?)?.toDouble() ?? 0;
-        }
+    // ── Compute summary for the header based on the selected range ──
+    double rangeTotal = 0;
+    for (var s in filtered) {
+      switch (_selectedWorkoutMetric) {
+        case 'Reps':
+          rangeTotal += (s['total_reps'] as num?)?.toDouble() ?? 0;
+          break;
+        case 'Seconds':
+          rangeTotal += (s['total_seconds'] as num?)?.toDouble() ?? 0;
+          break;
+        default: // Volume
+          rangeTotal += (s['total_volume'] as num?)?.toDouble() ?? 0;
       }
     }
 
-    String headerValue = weekTotal.toStringAsFixed(0);
+    String headerValue = rangeTotal.toStringAsFixed(0);
     String headerUnit;
     switch (_selectedWorkoutMetric) {
       case 'Reps':
@@ -625,10 +697,23 @@ class ProfilePageState extends State<ProfilePage> {
 
     // Build date label map
     final dateLabels = <int, String>{};
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final Set<int> visibleLabelIndices = {};
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+
+    int N = entries.length;
+    if (N <= 7) {
+      for (int i = 0; i < N; i++) visibleLabelIndices.add(i);
+    } else {
+      for (int i = 0; i < 7; i++) {
+        visibleLabelIndices.add((i * (N - 1) / 6).round());
+      }
+    }
+
     for (int i = 0; i < entries.length; i++) {
-      dateLabels[i] = '${months[entries[i].dt.month - 1]} ${entries[i].dt.day}';
+      final dt = entries[i].dt;
+      dateLabels[i] = '${months[dt.month - 1]} ${dt.day}';
     }
 
     return Container(
@@ -657,8 +742,11 @@ class ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                     const TextSpan(
-                      text: ' this week',
-                      style: TextStyle(
+                      text: ' ',
+                    ),
+                    TextSpan(
+                      text: _selectedWorkoutRange.toLowerCase(),
+                      style: const TextStyle(
                         color: Colors.white54,
                         fontSize: 16,
                         fontWeight: FontWeight.normal,
@@ -672,10 +760,14 @@ class ProfilePageState extends State<ProfilePage> {
                 dropdownColor: Colors.grey.shade800,
                 style: const TextStyle(color: Colors.blueAccent, fontSize: 14),
                 underline: const SizedBox(),
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
-                items: ['Last month', 'Last 3 months', 'Last 6 months', 'All time']
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
+                icon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: Colors.blueAccent,
+                ),
+                items:
+                    ['Last 7 days', 'Last month', 'Last 3 months', 'Last 6 months', 'All time']
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                        .toList(),
                 onChanged: (v) {
                   if (v != null) setState(() => _selectedWorkoutRange = v);
                 },
@@ -695,10 +787,8 @@ class ProfilePageState extends State<ProfilePage> {
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: chartMaxY / 4,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: Colors.white10,
-                    strokeWidth: 1,
-                  ),
+                  getDrawingHorizontalLine: (value) =>
+                      FlLine(color: Colors.white10, strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
@@ -724,21 +814,25 @@ class ProfilePageState extends State<ProfilePage> {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 28,
-                      interval: entries.length > 7
-                          ? (entries.length / 6).ceilToDouble()
-                          : 1,
+                      reservedSize: 40,
+                      interval: 1,
                       getTitlesWidget: (value, meta) {
                         final idx = value.toInt();
+                        if (idx < 0 || idx >= dateLabels.length) return const SizedBox();
+                        if (!visibleLabelIndices.contains(idx)) return const SizedBox();
+                        
                         final label = dateLabels[idx];
                         if (label == null) return const SizedBox();
                         return Padding(
                           padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            label,
-                            style: const TextStyle(
-                              color: Colors.white38,
-                              fontSize: 9,
+                          child: Transform.rotate(
+                            angle: -0.5,
+                            child: Text(
+                              label,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 9,
+                              ),
                             ),
                           ),
                         );
@@ -757,8 +851,7 @@ class ProfilePageState extends State<ProfilePage> {
                     getTooltipColor: (_) => Colors.white,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final label = dateLabels[group.x] ?? '';
-                      final val = rod.toY.toStringAsFixed(
-                          rod.toY < 10 ? 1 : 0);
+                      final val = rod.toY.toStringAsFixed(rod.toY < 10 ? 1 : 0);
                       return BarTooltipItem(
                         '$val $yUnit\n',
                         const TextStyle(
@@ -1020,28 +1113,31 @@ class ProfilePageState extends State<ProfilePage> {
     required String title,
     required List<Widget> legends,
     required Widget chart,
+    Widget? customHeader,
   }) {
     return Container(
       width: double.infinity,
-      height: 240,
+      height: 290,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey.shade900,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(spacing: 16, children: legends),
+          customHeader ??
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
           const SizedBox(height: 12),
+          Wrap(spacing: 16, children: legends),
+          const SizedBox(height: 16),
           Expanded(child: chart),
         ],
       ),
@@ -1067,12 +1163,12 @@ class ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  FlTitlesData _chartTitles(double maxY, Map<double, String> dateLabels) {
+  FlTitlesData _chartTitles(double maxY, Map<double, String> dateLabels, [Set<double>? visibleKeys]) {
     return FlTitlesData(
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 40,
+          reservedSize: 30, // changed slightly for better spacing
           getTitlesWidget: (value, meta) {
             if (value == 0 || value >= maxY) return const SizedBox();
             return Text(
@@ -1085,27 +1181,32 @@ class ProfilePageState extends State<ProfilePage> {
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 24,
-          interval: dateLabels.length > 7
-              ? (dateLabels.length / 5).ceilToDouble()
-              : 1,
+          reservedSize: 30,
+          interval: 1, // Evaluate aggressively
           getTitlesWidget: (value, meta) {
-            // Find the closest x-value label (since x might be fractional days)
             String? label;
             double minDiff = double.infinity;
+            double? matchedKey;
+            
             for (final k in dateLabels.keys) {
               final diff = (k - value).abs();
               if (diff < 0.5 && diff < minDiff) {
                 minDiff = diff;
                 label = dateLabels[k];
+                matchedKey = k;
               }
             }
-            if (label == null) return const SizedBox();
+            if (label == null || matchedKey == null) return const SizedBox();
+            if (visibleKeys != null && !visibleKeys.contains(matchedKey)) return const SizedBox();
+            
             return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                label,
-                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              padding: const EdgeInsets.only(top: 10),
+              child: Transform.rotate(
+                angle: -0.5,
+                child: Text(
+                  label,
+                  style: const TextStyle(color: Colors.white54, fontSize: 9),
+                ),
               ),
             );
           },
@@ -1304,8 +1405,10 @@ class _ProgressVideoPlayerState extends State<_ProgressVideoPlayer> {
                 bottom: 8,
                 right: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(6),
@@ -1313,8 +1416,11 @@ class _ProgressVideoPlayerState extends State<_ProgressVideoPlayer> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.videocam,
-                          color: Colors.orangeAccent, size: 14),
+                      const Icon(
+                        Icons.videocam,
+                        color: Colors.orangeAccent,
+                        size: 14,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         _formatDuration(_controller.value.duration),

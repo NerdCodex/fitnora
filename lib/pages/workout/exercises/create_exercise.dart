@@ -6,7 +6,6 @@ import 'package:fitnora/components/custom_image_picker.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/components/form_label.dart';
 import 'package:fitnora/components/text_field.dart';
-import 'package:fitnora/services/constants.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
 import 'package:flutter/material.dart';
@@ -119,7 +118,9 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
                       FormLabel(text: "Exercise Equipment"),
                       CustomDropDown(
                         items: equipmentList,
-                        initialValue: selectedEquipment.isEmpty ? null : selectedEquipment,
+                        initialValue: selectedEquipment.isEmpty
+                            ? null
+                            : selectedEquipment,
                         hintText: "Select Equipment",
                         onChange: (value) {
                           selectedEquipment = value!;
@@ -129,7 +130,9 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
                       FormLabel(text: "Exercise measurement"),
                       CustomDropDown(
                         items: ["reps", "seconds"],
-                        initialValue: selectedExerciseType.isEmpty ? null : selectedExerciseType,
+                        initialValue: selectedExerciseType.isEmpty
+                            ? null
+                            : selectedExerciseType,
                         hintText: "Select Measurement",
                         onChange: (value) {
                           selectedExerciseType = value!;
@@ -180,7 +183,8 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
     } else {
       // UPDATE — check if exercise type changed
       final exerciseId = int.parse(widget.exerciseId);
-      final typeChanged = _originalExerciseType.isNotEmpty && 
+      final typeChanged =
+          _originalExerciseType.isNotEmpty &&
           selectedExerciseType != _originalExerciseType;
 
       if (typeChanged) {
@@ -188,10 +192,12 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
             .hasExerciseSessions(exerciseId);
 
         if (hasSessions) {
+          if (!mounted) return;
           final confirm = await showConfirmDialog(
             context,
             title: "Exercise Type Changed",
-            content: "Changing the exercise type from '$_originalExerciseType' to "
+            content:
+                "Changing the exercise type from '$_originalExerciseType' to "
                 "'$selectedExerciseType' will delete all session data for this "
                 "exercise. Continue?",
             trueText: "DELETE & SAVE",
@@ -201,8 +207,9 @@ class _CreateExercisePageState extends State<CreateExercisePage> {
           if (confirm != true) return;
 
           // Delete all session data for this exercise
-          await WorkoutDatabaseService.instance
-              .deleteSessionsByExerciseId(exerciseId);
+          await WorkoutDatabaseService.instance.deleteSessionsByExerciseId(
+            exerciseId,
+          );
         }
       }
 

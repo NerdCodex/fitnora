@@ -92,8 +92,8 @@ class WorkoutDatabaseService {
       CREATE TABLE workout_session (
         session_id INTEGER PRIMARY KEY AUTOINCREMENT,
         routine_id INTEGER,
-        started_at INTEGER NOT NULL,
-        completed_at INTEGER NOT NULL,
+        started_at INTEGER,
+        completed_at INTEGER,
 
         FOREIGN KEY (routine_id) REFERENCES routine(routine_id) ON DELETE SET NULL
       );
@@ -165,8 +165,6 @@ class WorkoutDatabaseService {
       );
     ''');
   }
-
-
 
   // ================================================================
   //  EXERCISE METHODS (existing)
@@ -372,7 +370,7 @@ class WorkoutDatabaseService {
     });
   }
 
-   Future<Map<String, dynamic>> getRoutineForEdit(int routineId) async {
+  Future<Map<String, dynamic>> getRoutineForEdit(int routineId) async {
     final db = await database;
 
     // 1. Get routine metadata
@@ -418,11 +416,7 @@ class WorkoutDatabaseService {
 
   Future<void> deleteRoutine(int routineId) async {
     final db = await database;
-    await db.delete(
-      'routine',
-      where: 'routine_id = ?',
-      whereArgs: [routineId],
-    );
+    await db.delete('routine', where: 'routine_id = ?', whereArgs: [routineId]);
   }
 
   // ================================================================
@@ -440,6 +434,7 @@ class WorkoutDatabaseService {
       final sessionId = await txn.insert('workout_session', {
         'routine_id': routineId,
         'started_at': (startedAt ?? DateTime.now()).millisecondsSinceEpoch,
+        'completed_at': 0, // Fallback for outdated NOT NULL constraint on user's DB
       });
 
       // 2. Copy exercises from the routine
@@ -506,10 +501,7 @@ class WorkoutDatabaseService {
         orderBy: 'set_order ASC',
       );
 
-      result.add({
-        ...ex,
-        'sets': sets,
-      });
+      result.add({...ex, 'sets': sets});
     }
 
     return result;
@@ -585,11 +577,7 @@ class WorkoutDatabaseService {
     final db = await database;
     await db.update(
       'session_set',
-      {
-        'weight': weight,
-        'value': value,
-        'is_completed': isCompleted ? 1 : 0,
-      },
+      {'weight': weight, 'value': value, 'is_completed': isCompleted ? 1 : 0},
       where: 'set_id = ?',
       whereArgs: [setId],
     );
@@ -598,19 +586,20 @@ class WorkoutDatabaseService {
   /// Delete a specific set.
   Future<void> deleteSessionSet(int setId) async {
     final db = await database;
-    await db.delete(
-      'session_set',
-      where: 'set_id = ?',
-        whereArgs: [setId],
-    );
+    await db.delete('session_set', where: 'set_id = ?', whereArgs: [setId]);
   }
 
   /// Complete a workout session.
-  Future<void> completeSession(int sessionId, {int? startedAt, int? completedAt}) async {
+  Future<void> completeSession(
+    int sessionId, {
+    int? startedAt,
+    int? completedAt,
+  }) async {
     final db = await database;
     final updates = <String, dynamic>{};
     if (startedAt != null) updates['started_at'] = startedAt;
-    updates['completed_at'] = completedAt ?? DateTime.now().millisecondsSinceEpoch;
+    updates['completed_at'] =
+        completedAt ?? DateTime.now().millisecondsSinceEpoch;
     await db.update(
       'workout_session',
       updates,
@@ -625,9 +614,7 @@ class WorkoutDatabaseService {
     final db = await database;
     await db.update(
       'workout_session',
-      {
-        'completed_at': DateTime.now().millisecondsSinceEpoch,
-      },
+      {'completed_at': DateTime.now().millisecondsSinceEpoch},
       where: 'session_id = ?',
       whereArgs: [sessionId],
     );
@@ -649,7 +636,7 @@ class WorkoutDatabaseService {
       LEFT JOIN session_exercise se ON se.session_id = ws.session_id
       LEFT JOIN session_set ss ON ss.session_exercise_id = se.session_exercise_id
       LEFT JOIN exercise e ON e.exercise_id = se.exercise_id
-      WHERE ws.completed_at IS NOT NULL
+      WHERE ws.completed_at IS NOT NULL AND ws.completed_at != 0
       GROUP BY ws.session_id
       ORDER BY ws.started_at DESC
     ''');
@@ -679,16 +666,14 @@ class WorkoutDatabaseService {
       'waist': data['waist'],
       'hips': data['hips'],
       'progress_image': data['progress_image'],
-      'measured_at': data['measured_at'] ?? DateTime.now().millisecondsSinceEpoch,
+      'measured_at':
+          data['measured_at'] ?? DateTime.now().millisecondsSinceEpoch,
     });
   }
 
   Future<List<Map<String, dynamic>>> getMeasurements() async {
     final db = await database;
-    return await db.query(
-      'body_measurement',
-      orderBy: 'measured_at DESC',
-    );
+    return await db.query('body_measurement', orderBy: 'measured_at DESC');
   }
 
   Future<Map<String, dynamic>?> getLatestMeasurement() async {
@@ -775,19 +760,12 @@ class WorkoutDatabaseService {
 
   Future<void> deleteFoodItem(int foodId) async {
     final db = await database;
-    await db.delete(
-      'food_item',
-      where: 'food_id = ?',
-      whereArgs: [foodId],
-    );
+    await db.delete('food_item', where: 'food_id = ?', whereArgs: [foodId]);
   }
 
   Future<List<Map<String, dynamic>>> getFoodItems() async {
     final db = await database;
-    return await db.query(
-      'food_item',
-      orderBy: 'food_name ASC',
-    );
+    return await db.query('food_item', orderBy: 'food_name ASC');
   }
 
   Future<List<Map<String, dynamic>>> searchFoodItems(String query) async {
@@ -815,18 +793,31 @@ class WorkoutDatabaseService {
   Future<List<Map<String, dynamic>>> getMealsByDate(DateTime date) async {
     final db = await database;
 
-    final startOfDay = DateTime(date.year, date.month, date.day)
-        .millisecondsSinceEpoch;
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999)
-        .millisecondsSinceEpoch;
+    final startOfDay = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).millisecondsSinceEpoch;
+    final endOfDay = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      23,
+      59,
+      59,
+      999,
+    ).millisecondsSinceEpoch;
 
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT ml.*, fi.food_name, fi.calories, fi.protein, fi.carbs, fi.fat, fi.serving_size
       FROM meal_log ml
       JOIN food_item fi ON fi.food_id = ml.food_id
       WHERE ml.logged_at BETWEEN ? AND ?
       ORDER BY ml.logged_at DESC
-    ''', [startOfDay, endOfDay]);
+    ''',
+      [startOfDay, endOfDay],
+    );
   }
 
   Future<void> deleteMealLog(int mealLogId) async {
@@ -844,7 +835,7 @@ class WorkoutDatabaseService {
     if (data.containsKey('servings')) updates['servings'] = data['servings'];
     if (data.containsKey('meal_type')) updates['meal_type'] = data['meal_type'];
     if (data.containsKey('logged_at')) updates['logged_at'] = data['logged_at'];
-    
+
     if (updates.isEmpty) return;
 
     await db.update(
@@ -859,12 +850,23 @@ class WorkoutDatabaseService {
   Future<Map<String, double>> getDailyNutritionSummary(DateTime date) async {
     final db = await database;
 
-    final startOfDay = DateTime(date.year, date.month, date.day)
-        .millisecondsSinceEpoch;
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59, 999)
-        .millisecondsSinceEpoch;
+    final startOfDay = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).millisecondsSinceEpoch;
+    final endOfDay = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      23,
+      59,
+      59,
+      999,
+    ).millisecondsSinceEpoch;
 
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
       SELECT
         COALESCE(SUM(fi.calories * ml.servings), 0) as total_calories,
         COALESCE(SUM(fi.protein * ml.servings), 0) as total_protein,
@@ -873,7 +875,9 @@ class WorkoutDatabaseService {
       FROM meal_log ml
       JOIN food_item fi ON fi.food_id = ml.food_id
       WHERE ml.logged_at BETWEEN ? AND ?
-    ''', [startOfDay, endOfDay]);
+    ''',
+      [startOfDay, endOfDay],
+    );
 
     if (result.isNotEmpty) {
       return {
@@ -914,11 +918,20 @@ class WorkoutDatabaseService {
   Future<bool> hasTodayWorkout() async {
     final db = await database;
     final now = DateTime.now();
-    final startOfDay =
-        DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    final endOfDay =
-        DateTime(now.year, now.month, now.day, 23, 59, 59, 999)
-            .millisecondsSinceEpoch;
+    final startOfDay = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).millisecondsSinceEpoch;
+    final endOfDay = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      23,
+      59,
+      59,
+      999,
+    ).millisecondsSinceEpoch;
 
     final result = await db.rawQuery(
       '''SELECT COUNT(*) as cnt FROM workout_session
@@ -933,11 +946,20 @@ class WorkoutDatabaseService {
   Future<Set<String>> getTodayMealTypes() async {
     final db = await database;
     final now = DateTime.now();
-    final startOfDay =
-        DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    final endOfDay =
-        DateTime(now.year, now.month, now.day, 23, 59, 59, 999)
-            .millisecondsSinceEpoch;
+    final startOfDay = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).millisecondsSinceEpoch;
+    final endOfDay = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      23,
+      59,
+      59,
+      999,
+    ).millisecondsSinceEpoch;
 
     final result = await db.rawQuery(
       '''SELECT DISTINCT meal_type FROM meal_log
