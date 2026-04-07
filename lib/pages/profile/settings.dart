@@ -11,6 +11,7 @@ import 'package:fitnora/services/backup_service.dart';
 import 'package:fitnora/services/notification_service.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
+import 'package:fitnora/services/pdf_report_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
@@ -147,6 +148,11 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: _lastRestore.isNotEmpty ? "Last restore: $_lastRestore" : null,
             onTap: handleRestore,
           ),
+          SettingsTile(
+            icon: Icons.picture_as_pdf_outlined,
+            title: "Export Report (PDF)",
+            onTap: _showPdfExportSheet,
+          ),
           const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
@@ -163,6 +169,133 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showPdfExportSheet() async {
+    DateTime? startDate;
+    DateTime? endDate;
+    bool allData = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text("Export PDF Report", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 20),
+                  
+                  CheckboxListTile(
+                    title: const Text("Export All Data (Ignore dates)", style: TextStyle(color: Colors.white)),
+                    value: allData,
+                    activeColor: Colors.blueAccent,
+                    onChanged: (val) {
+                      if (val != null) setSheetState(() => allData = val);
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  
+                  if (!allData) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.date_range, size: 18),
+                            label: Text(startDate == null ? "Start Date" : "${startDate!.day}/${startDate!.month}/${startDate!.year}"),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: startDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) setSheetState(() => startDate = picked);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.date_range, size: 18),
+                            label: Text(endDate == null ? "End Date" : "${endDate!.day}/${endDate!.month}/${endDate!.year}"),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: endDate ?? startDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) setSheetState(() => endDate = picked);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 30),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                       backgroundColor: Colors.blueAccent,
+                       padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: () async {
+                      if (!allData && (startDate == null || endDate == null)) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a valid date range.")));
+                        return;
+                      }
+                      
+                      Navigator.pop(context);
+                      
+                      try {
+                        showDialog(
+                          context: context, 
+                          barrierDismissible: false,
+                          builder: (_) => const Center(child: CircularProgressIndicator())
+                        );
+
+                        int? sMs, eMs;
+                        if (!allData) {
+                          sMs = DateTime(startDate!.year, startDate!.month, startDate!.day).millisecondsSinceEpoch;
+                          eMs = DateTime(endDate!.year, endDate!.month, endDate!.day, 23, 59, 59).millisecondsSinceEpoch;
+                        }
+
+                        final data = await WorkoutDatabaseService.instance.getReportData(sMs, eMs);
+                        await PdfReportService.generateAndSharePdf(data);
+                        
+                        if (context.mounted) Navigator.pop(context);
+                      } catch(e) {
+                        if (context.mounted) Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                      }
+                    },
+                    child: const Text("Generate PDF", style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
+            );
+          }
+        );
+      }
     );
   }
 

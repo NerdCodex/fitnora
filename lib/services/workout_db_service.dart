@@ -968,4 +968,84 @@ class WorkoutDatabaseService {
     );
     return result.map((r) => (r['meal_type'] as String).toLowerCase()).toSet();
   }
+
+  // ================================================================
+  //  PDF EXPORT REPORT DATA
+  // ================================================================
+
+  Future<Map<String, dynamic>> getReportData(int? startMs, int? endMs) async {
+    final db = await database;
+    
+    String sessionFilter = "";
+    String mealFilter = "";
+    List<dynamic> sessionArgs = [];
+    List<dynamic> mealArgs = [];
+    if (startMs != null && endMs != null) {
+      sessionFilter = "AND ws.started_at BETWEEN ? AND ?";
+      mealFilter = "WHERE ml.logged_at BETWEEN ? AND ?";
+      sessionArgs = [startMs, endMs];
+      mealArgs = [startMs, endMs];
+    } else {
+      sessionFilter = "";
+      mealFilter = "";
+    }
+
+    // 1. Get Workout Sessions
+    final sessions = await db.rawQuery('''
+      SELECT ws.session_id, ws.started_at, ws.completed_at, r.routine_name
+      FROM workout_session ws
+      LEFT JOIN routine r ON r.routine_id = ws.routine_id
+      WHERE ws.completed_at > 0 $sessionFilter
+      ORDER BY ws.started_at ASC
+    ''', sessionArgs);
+
+    List<Map<String, dynamic>> structuredWorkouts = [];
+    for (var session in sessions) {
+      final sessionId = session['session_id'];
+      
+      // Get exercises and their sets for this session
+      final exercises = await db.rawQuery('''
+        SELECT se.session_exercise_id, e.exercise_name, e.exercise_type
+        FROM session_exercise se
+        JOIN exercise e ON e.exercise_id = se.exercise_id
+        WHERE se.session_id = ?
+        ORDER BY se.exercise_order ASC
+      ''', [sessionId]);
+
+      List<Map<String, dynamic>> exerciseDetails = [];
+      for (var ex in exercises) {
+        final sets = await db.rawQuery('''
+          SELECT ss.set_order, ss.weight, ss.value, ss.is_completed
+          FROM session_set ss
+          WHERE ss.session_exercise_id = ?
+          ORDER BY ss.set_order ASC
+        ''', [ex['session_exercise_id']]);
+
+        exerciseDetails.add({
+          'exercise_name': ex['exercise_name'],
+          'exercise_type': ex['exercise_type'],
+          'sets': sets,
+        });
+      }
+
+      structuredWorkouts.add({
+        'session': session,
+        'exercises': exerciseDetails,
+      });
+    }
+
+    // 2. Get Meal Logs
+    final meals = await db.rawQuery('''
+      SELECT ml.logged_at, ml.meal_type, ml.servings, fi.food_name, fi.serving_size, fi.calories, fi.protein, fi.carbs, fi.fat
+      FROM meal_log ml
+      JOIN food_item fi ON fi.food_id = ml.food_id
+      $mealFilter
+      ORDER BY ml.logged_at ASC
+    ''', mealArgs);
+
+    return {
+      'workouts': structuredWorkouts,
+      'meals': meals,
+    };
+  }
 }
