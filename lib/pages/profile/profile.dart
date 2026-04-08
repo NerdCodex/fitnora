@@ -5,6 +5,7 @@ import 'package:fitnora/components/alert.dart';
 import 'package:fitnora/components/custom_image_picker.dart';
 import 'package:fitnora/components/dialog.dart';
 import 'package:fitnora/pages/profile/add_measurement.dart';
+import 'package:fitnora/pages/profile/full_screen_media_page.dart';
 import 'package:fitnora/pages/profile/settings.dart';
 import 'package:fitnora/services/user_session.dart';
 import 'package:fitnora/services/workout_db_service.dart';
@@ -321,16 +322,42 @@ class ProfilePageState extends State<ProfilePage> {
 
                     final fileName = m['progress_image'].toString();
                     if (isVideoFile(fileName)) {
-                      return _ProgressVideoPlayer(file: file);
+                      return _ProgressVideoPlayer(
+                        file: file,
+                        onLongPress: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FullScreenMediaPage(
+                                file: file,
+                                isVideo: true,
+                              ),
+                            ),
+                          );
+                        },
+                      );
                     }
 
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        file,
-                        width: double.infinity,
-                        height: 200,
-                        fit: BoxFit.cover,
+                    return GestureDetector(
+                      onLongPress: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FullScreenMediaPage(
+                              file: file,
+                              isVideo: false,
+                            ),
+                          ),
+                        );
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          file,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     );
                   },
@@ -1329,7 +1356,8 @@ class _BarEntry {
 /// Inline video player for progress videos in the daily measurement card.
 class _ProgressVideoPlayer extends StatefulWidget {
   final File file;
-  const _ProgressVideoPlayer({required this.file});
+  final VoidCallback? onLongPress;
+  const _ProgressVideoPlayer({required this.file, this.onLongPress});
 
   @override
   State<_ProgressVideoPlayer> createState() => _ProgressVideoPlayerState();
@@ -1376,6 +1404,7 @@ class _ProgressVideoPlayerState extends State<_ProgressVideoPlayer> {
                   : _controller.play();
             });
           },
+          onLongPress: widget.onLongPress,
           child: Stack(
             alignment: Alignment.center,
             children: [
